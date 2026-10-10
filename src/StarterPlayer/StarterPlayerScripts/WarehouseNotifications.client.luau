@@ -47,7 +47,7 @@ local function resizeNotice()
 	-- Share safe-area geometry with the HUD; never place a notice over its cash or buttons.
 	local x, y
 	if width >= 760 then
-		x = math.max(m.x + m.cashWidth + 16, (width - 430) / 2); y = 8
+		x = math.max(m.toggleX + 44 + 12, (width - 430) / 2); y = 8
 	else
 		x = m.x + m.navWidth + 14; y = m.y + m.cashHeight + 12
 	end

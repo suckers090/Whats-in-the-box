@@ -20,6 +20,10 @@ setmetatable(Enum,{__index=function(self,key)
  local namespace=setmetatable({},{__index=function(_,name) return name end}); rawset(self,key,namespace); return namespace
 end})
 local UDim={new=function(scale,offset) return {scale,offset} end}
+local ColorSequence={new=function(...) return {...} end}
+local ColorSequenceKeypoint={new=function(...) return {...} end}
+local NumberSequence={new=function(...) return {...} end}
+local NumberSequenceKeypoint={new=function(...) return {...} end}
 UDim2.new=function(...) return {...} end
 UDim2.fromOffset=function(x,y) return {0,x,0,y} end
 UDim2.fromScale=function(x,y) return {x,0,y,0} end
@@ -97,6 +101,7 @@ local hudCount=0; for _,child in ipairs(playerGui:GetChildren()) do if child.Nam
 assert(hudCount==1 and #event.OnClientEvent.callbacks==1,'A second script must not duplicate HUD or inventory listeners')
 assert(gui.ResetOnSpawn==false and gui.ScreenInsets==Enum.ScreenInsets.CoreUISafeInsets)
 local nav=gui:FindFirstChild('IconNavigation',true)
+local toggle=gui:FindFirstChild('NavigationToggle',true)
 local safe=gui:FindFirstChild('SafeArea'); local cash=gui:FindFirstChild('CashCard',true)
 local noticeGui=playerGui:FindFirstChild('WarehouseNotifications')
 local noticeSafe=noticeGui:FindFirstChild('NotificationSafeArea')
@@ -105,13 +110,15 @@ local function box(value)
  return {x=value.Position[2],y=value.Position[4],w=value.Size[2],h=value.Size[4]}
 end
 local function overlaps(a,b) return a.x<b.x+b.w and a.x+a.w>b.x and a.y<b.y+b.h and a.y+a.h>b.y end
-for _,device in ipairs({{1920,980,false},{1024,690,false},{768,900,true},{390,720,true},{320,500,true},{844,300,true},{568,230,true}}) do
+for _,device in ipairs({{1920,980,false},{1024,690,false},{768,900,true},{390,720,true},{320,500,true},{280,420,true},{844,300,true},{568,230,true}}) do
  local w,h,touch=device[1],device[2],device[3]; input.TouchEnabled=touch
  safe.AbsoluteSize={X=w,Y=h}; noticeSafe.AbsoluteSize={X=w,Y=h}
  safe:GetPropertyChangedSignal('AbsoluteSize'):Fire(); noticeSafe:GetPropertyChangedSignal('AbsoluteSize'):Fire()
- local c,n,t=box(cash),box(nav),box(notice)
+ local c,n,t,a=box(cash),box(nav),box(notice),box(toggle)
  assert(c.x>=0 and c.x+c.w<=w and n.y>c.y+c.h and n.x+n.w<=w and n.y+n.h<=h)
  assert(not overlaps(c,t) and not overlaps(n,t),'Cash/navigation must not overlap notices across device sizes')
+ assert(a.w>=44 and a.h>=44 and a.x+a.w<=w and a.y>=0 and not overlaps(a,c) and not overlaps(a,t),'Toggle is reachable without covering cash or notices')
+ assert(c.h<96,'Cash uses less space than the previous HUD')
  if touch then assert(n.y+n.h<=h-math.min(150,h*0.4),'Navigation leaves a thumbstick region') end
  for _,item in ipairs(dependencies.HUDNavigation(theme,dependencies.VisualConfig,dependencies.UIStyle,dependencies.Presentation).Items) do
   local b=nav:FindFirstChild(item.id..'Nav'); assert(b and b.Text=='' and b:FindFirstChild(item.id..'Icon',true))
@@ -128,9 +135,34 @@ inventoryNav.MouseLeave:Fire(); assert(navScale.Scale==1)
 dependencies.VisualConfig.ReducedMotion=true
 inventoryNav.MouseEnter:Fire(); assert(navScale.Scale==1,'Reduced motion suppresses scale animation')
 inventoryNav.MouseLeave:Fire()
+local beforeCollapse=#event.sent
+GuiService.SelectedObject=inventoryNav
+toggle.Activated:Fire()
+assert(not nav.Visible and cash.Visible and toggle.Visible and toggle:GetAttribute('Collapsed'))
+assert(not inventoryNav.Active and not inventoryNav.Selectable and GuiService.SelectedObject==toggle,'Collapse removes hidden controller focus and actions')
+inventoryNav.Activated:Fire(); assert(#event.sent==beforeCollapse,'Hidden button cannot issue gameplay requests')
+assert(toggle:FindFirstChild('CollapseIcon',true).Rotation==180)
+safe.AbsoluteSize={X=390,Y=720}; safe:GetPropertyChangedSignal('AbsoluteSize'):Fire()
+assert(not nav.Visible,'Resizing preserves collapse preference')
+input.InputBegan:Fire({KeyCode=Enum.KeyCode.B},false)
+assert(inventoryNav:FindFirstChild('ActiveMark').Visible and not nav.Visible,'Keyboard shortcuts retain menu access without expanding the hidden stack')
+click(gui,'X'); assert(not nav.Visible and GuiService.SelectedObject==toggle)
+toggle.Activated:Fire(); assert(nav.Visible and inventoryNav.Active and toggle:FindFirstChild('CollapseIcon',true).Rotation==0)
+dependencies.VisualConfig.ReducedMotion=false
+toggle.Activated:Fire(); toggle.Activated:Fire(); toggle.Activated:Fire()
+safe.AbsoluteSize={X=568,Y=230}; safe:GetPropertyChangedSignal('AbsoluteSize'):Fire()
+for _,timer in ipairs(table.clone(delayed)) do if timer.seconds==0.2 then timer.callback() end end
+assert(not nav.Visible,'Old collapse animation callbacks cannot reopen a resized hidden stack')
+toggle.Activated:Fire()
+for _,timer in ipairs(table.clone(delayed)) do if timer.seconds==0.2 then timer.callback() end end
+assert(nav.Visible and inventoryNav.Active,'Rapid toggles settle at the latest state')
+dependencies.VisualConfig.ReducedMotion=true
+safe.AbsoluteSize={X=1280,Y=720}; safe:GetPropertyChangedSignal('AbsoluteSize'):Fire()
 for _,item in ipairs({'Inventory','Index','Shop','Upgrades','Scanner'}) do
  click(gui,item)
  assert(nav:FindFirstChild(item..'Nav'):FindFirstChild('ActiveMark').Visible,'Selected menu matches navigation')
+ local selectedFace=nav:FindFirstChild(item..'Nav'):FindFirstChild('BubbleFace')
+ assert(selectedFace:FindFirstChildOfClass('UIStroke').Thickness==1.7,'Selection keeps a stronger border after focus moves into the menu')
  click(gui,'X'); assert(not nav:FindFirstChild(item..'Nav'):FindFirstChild('ActiveMark').Visible)
 end
 click(gui,'Shop'); click(gui,'OPEN INVENTORY')
@@ -202,7 +234,16 @@ boxEvent.OnClientEvent:Fire('Closed',{token='older'}); assert(backdrop.Visible)
 assert(not nav.Visible,'Stale reward acknowledgement cannot restore navigation over a reveal')
 boxEvent.OnClientEvent:Fire('Closed',{token='r1'}); assert(not backdrop.Visible)
 assert(nav.Visible,'Navigation returns after current reveal closes')
-print('PASS: unique HUD, five real icon menu callbacks, Home, selected/hover/tap states, seven device layouts and notice exclusion; inventory safeguards and receipt-aware reveal preserved')
+toggle.Activated:Fire(); assert(not nav.Visible)
+boxEvent.OnClientEvent:Fire('Reveal',{id='old_toy',token='r2',name='Old Toy',rarity='Common',value=25,isNew=false})
+assert(not nav.Visible and not toggle.Visible)
+safe.AbsoluteSize={X=320,Y=500}; safe:GetPropertyChangedSignal('AbsoluteSize'):Fire()
+assert(not toggle.Visible,'Resize cannot expose toggle during a reveal')
+boxEvent.OnClientEvent:Fire('Closed',{token='r2'})
+assert(not nav.Visible and toggle.Visible and toggle:GetAttribute('Collapsed'),'Closing reveal preserves collapsed preference')
+toggle.Activated:Fire(); assert(nav.Visible and inventoryNav.Active)
+runHUD(); assert(playerGui:FindFirstChild('WarehouseHUD')==gui,'Duplicate/respawn controller keeps current navigation state')
+print('PASS: bubble HUD menu/hover/tap/selected callbacks, eight device layouts, notice/toggle exclusion, rapid collapse/resize/reveal handling and original inventory safeguards')
 '''
 with tempfile.TemporaryDirectory() as directory:
     for name in ('ItemCatalog', 'CollectionMilestones', 'InventoryView', 'RevealStyle', 'HUDLayout'):

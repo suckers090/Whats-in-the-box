@@ -2,6 +2,9 @@
 
 Existing Roblox warehouse mystery-package game.
 
+The [bubble HUD refinement](docs/BUBBLE_HUD.md) adds rounder faces, subtle depth,
+compact cash spacing and a collapsible navigation arrow to the existing icon HUD.
+
 The [industrial icon HUD](docs/ICON_HUD.md) replaces the bottom navigation with a
 responsive left-side icon stack and polished cash card. Existing menus, inventory
 safeguards and Home travel remain connected; server gameplay and saves are unchanged.

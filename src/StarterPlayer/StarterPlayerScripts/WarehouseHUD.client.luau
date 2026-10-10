@@ -27,6 +27,7 @@ local boxEvent = RS:WaitForChild("BoxEvent")
 local state = {inventory = {}, discoveries = {}, collectionClaims = {}, inventoryLocks = {}, inventoryFavorites = {}, plot = 0, scanner = false}
 local currentTab, revealActive, previousSelection = nil, false, nil
 local revealToken
+local navCollapsed, navGeneration, navTween, navMetrics = false, 0, nil, nil
 local sortIndex, filterIndex, sequence = 1, 1, 0
 local pendingRequest, saleQuote = nil, nil
 local inventoryMessage = "Locks protect every sale. Favorites are excluded from duplicate sales."
@@ -63,7 +64,7 @@ local gui = create("ScreenGui", {Name = "WarehouseHUD", ResetOnSpawn = false, Di
 	ZIndexBehavior = Enum.ZIndexBehavior.Sibling}, playerGui)
 local safeRoot = create("Frame", {Name = "SafeArea", Size = UDim2.fromScale(1, 1),
 	BackgroundTransparency = 1}, gui)
-local hud = create("Frame", {Name = "CashCard", Size = UDim2.fromOffset(230, 96), Position = UDim2.fromOffset(14, 8),
+local hud = create("Frame", {Name = "CashCard", Size = UDim2.fromOffset(216, 84), Position = UDim2.fromOffset(14, 8),
 	BackgroundColor3 = theme.Background, BackgroundTransparency = 0.04, BorderSizePixel = 0}, safeRoot)
 style.Surface(hud, 18)
 local cashBadge = create("Frame", {Name = "CashBadge", Position = UDim2.fromOffset(12, 25), Size = UDim2.fromOffset(32, 32),
@@ -105,30 +106,71 @@ local dock = create("ScrollingFrame", {Name = "IconNavigation", Position = UDim2
 	CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y,
 	ScrollingDirection = Enum.ScrollingDirection.Y, ScrollBarThickness = 2,
 	ScrollBarImageColor3 = theme.Accent, VerticalScrollBarInset = Enum.ScrollBarInset.None}, safeRoot)
-create("UIPadding", {PaddingLeft = UDim.new(0, 3), PaddingTop = UDim.new(0, 3), PaddingBottom = UDim.new(0, 3)}, dock)
+create("UIPadding", {PaddingLeft = UDim.new(0, 3), PaddingTop = UDim.new(0, 4), PaddingBottom = UDim.new(0, 4)}, dock)
 local navList = create("UIListLayout", {FillDirection = Enum.FillDirection.Vertical,
 	Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder}, dock)
 local scrollHint = text(safeRoot, "SWIPE", 9, UDim2.fromOffset(14, 504), UDim2.fromOffset(78, 12), theme.Muted)
 scrollHint.TextXAlignment = Enum.TextXAlignment.Center; scrollHint.Visible = false
+local refreshNavigation
+local toggle = navigation.Toggle(safeRoot, function()
+	if revealActive then return end
+	navCollapsed = not navCollapsed
+	refreshNavigation(true)
+end)
+local function selectedInNavigation()
+	local node = GuiService.SelectedObject
+	while node do if node == dock then return true end; node = node.Parent end
+	return false
+end
+refreshNavigation = function(animate)
+	if not navMetrics then return end
+	local m = navMetrics
+	navGeneration += 1
+	local generation = navGeneration
+	if navTween then navTween:Cancel(); navTween = nil end
+	local enabled = not navCollapsed and not revealActive
+	toggle.Button.Visible = not revealActive
+	toggle.Collapsed(navCollapsed)
+	for _, handle in pairs(navButtons) do
+		handle.Button.Active = enabled; handle.Button.Selectable = enabled
+	end
+	dock.ScrollingEnabled = enabled
+	scrollHint.Visible = enabled and m.scroll
+	if not enabled and selectedInNavigation() then
+		if revealActive then GuiService.SelectedObject = nil else GuiService.SelectedObject = toggle.Button end
+	end
+	local destination = UDim2.fromOffset(navCollapsed and -m.navWidth - 8 or m.x, m.navY)
+	if revealActive then dock.Visible = false; return end
+	if animate and not visualConfig.ReducedMotion then
+		dock.Visible = true
+		navTween = TweenService:Create(dock, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = destination})
+		navTween:Play()
+		task.delay(0.2, function()
+			if generation == navGeneration and gui.Parent then dock.Visible = not navCollapsed and not revealActive end
+		end)
+	else dock.Position = destination; dock.Visible = enabled end
+end
 local function resizeNavigation()
 	if safeRoot.AbsoluteSize.X <= 0 or safeRoot.AbsoluteSize.Y <= 0 then return end
 	local m = layout.Measure(safeRoot.AbsoluteSize.X, safeRoot.AbsoluteSize.Y, UserInputService.TouchEnabled)
+	navMetrics = m
 	hud.Position = UDim2.fromOffset(m.x, m.y); hud.Size = UDim2.fromOffset(m.cashWidth, m.cashHeight)
-	dock.Position = UDim2.fromOffset(m.x, m.navY); dock.Size = UDim2.fromOffset(m.navWidth, m.navHeight)
+	dock.Size = UDim2.fromOffset(m.navWidth, m.navHeight)
+	toggle.Button.Position = UDim2.fromOffset(m.toggleX, m.toggleY)
 	navList.Padding = UDim.new(0, m.gap)
-	cashHeading.Position = UDim2.fromOffset(14, m.compact and 4 or 9)
-	cashLabel.Position = UDim2.fromOffset(52, m.compact and 17 or 25)
-	cashLabel.Size = UDim2.new(1, -64, 0, m.compact and 26 or 32)
-	cashBadge.Position = UDim2.fromOffset(12, m.compact and 16 or 25)
+	cashHeading.Position = UDim2.fromOffset(14, 4)
+	cashLabel.Position = UDim2.fromOffset(52, m.compact and 15 or 18)
+	cashLabel.Size = UDim2.new(1, -64, 0, m.compact and 26 or 29)
+	cashBadge.Position = UDim2.fromOffset(12, m.compact and 15 or 17)
 	cashBadge.Size = UDim2.fromOffset(m.compact and 26 or 32, m.compact and 26 or 32)
-	plotLabel.Position = UDim2.fromOffset(14, m.compact and 44 or 57)
-	deliveryLabel.Position = UDim2.fromOffset(14, m.compact and 58 or 75)
+	plotLabel.Position = UDim2.fromOffset(14, m.compact and 40 or 48)
+	deliveryLabel.Position = UDim2.fromOffset(14, m.compact and 53 or 65)
 	plotLabel.Visible = not m.tiny; deliveryLabel.Visible = not m.tiny
 	for _, handle in pairs(navButtons) do handle.Resize(m.row, m.compact) end
-	scrollHint.Visible = m.scroll
 	scrollHint.Text = UserInputService.TouchEnabled and "SWIPE" or "SCROLL"
 	scrollHint.Position = UDim2.fromOffset(m.x, m.navY + m.navHeight + 2)
 	scrollHint.Size = UDim2.fromOffset(m.navWidth, 12)
+	refreshNavigation(false)
 end
 safeRoot:GetPropertyChangedSignal("AbsoluteSize"):Connect(resizeNavigation)
 UserInputService:GetPropertyChangedSignal("TouchEnabled"):Connect(resizeNavigation)
@@ -442,9 +484,9 @@ boxEvent.OnClientEvent:Connect(function(action, data)
 		revealToken = data and data.token
 		confirmLayer.Visible = false; saleQuote = nil
 		if shade.Visible then shade.Visible = false; currentTab = nil end
-		selectNavigation(); dock.Visible = false; scrollHint.Visible = false
+		selectNavigation(); refreshNavigation(false)
 	elseif action == "Closed" and (not data or data.token == revealToken) then
-		revealActive = false; revealToken = nil; dock.Visible = true; resizeNavigation()
+		revealActive = false; revealToken = nil; resizeNavigation()
 	end
 end)
 local function money(value)
