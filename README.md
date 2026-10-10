@@ -2,7 +2,7 @@
 
 Existing Roblox warehouse mystery-package game.
 
-The current test release adds shared-map player plots and a dark industrial HUD with session inventory and a collection index. Follow [plots/UI testing](docs/PLOTS_UI_TESTING.md) when updating your local project. This release needs Studio validation. Studio models and markers stay in the saved place; the gameplay/UI scripts live in src.
+The current test release adds persistent profiles to the shared-map warehouse plots and industrial HUD. Follow [persistence setup and testing](docs/PERSISTENCE_TESTING.md) when updating your local project. Ordinary Studio sessions default to preview mode with saving off; real Roblox saves require validation in a private test experience. Studio models and markers stay in the saved place; the gameplay/UI scripts live in src.
 
 Start with [Windows Rojo setup](docs/ROJO_SETUP.md) to connect this folder to a separate copy of the working Studio place. [Marker integration testing](docs/MARKER_TEST.md) explains the current gameplay checks and placement markers.
 
@@ -12,4 +12,4 @@ Start with [Windows Rojo setup](docs/ROJO_SETUP.md) to connect this folder to a 
 - backups/: original uploaded places and scripts before integration.
 - docs/: import history, testing, and setup guides.
 
-Interactive employee and garage doors are available for Studio testing: see [door testing](docs/DOOR_TESTING.md). Persistent data is future work. Current cash/inventory/discoveries/scanner state reset between server sessions. Rojo tracks script files, not the Blender warehouse assets.
+Interactive employee and garage doors are available for Studio testing: see [door testing](docs/DOOR_TESTING.md). Persistent cash/inventory/discoveries/scanner profiles are implemented for testing. Preview mode intentionally resets each server session. Actual Roblox DataStore integration has not been verified by the assistant. Rojo tracks script files, not the Blender warehouse assets.

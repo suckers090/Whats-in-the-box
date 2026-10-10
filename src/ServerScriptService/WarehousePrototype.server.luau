@@ -13,7 +13,8 @@ local boxEvent = remote("BoxEvent")
 local stateEvent = remote("WarehouseState")
 local notice = remote("WarehouseNotice")
 local rng = Random.new()
-local sessions = {}
+local sessions, loading = {}, {}
+local Profiles = require(script.Parent:WaitForChild("PlayerProfiles"))
 local Inventory = require(script.Parent:WaitForChild("InventoryState"))(items)
 local function pushState(player)
 	local data = sessions[player]
@@ -34,7 +35,7 @@ local function randomItem()
 end
 boxEvent.OnServerEvent:Connect(function(player, decision)
 	local data = sessions[player]
-	if not data then return end
+	if not data or player:GetAttribute("DataReady") ~= true then return end
 	local earned = Inventory.Resolve(data, decision)
 	if earned == nil then return end
 	player.leaderstats.Cash.Value += earned
@@ -44,6 +45,7 @@ end)
 stateEvent.OnServerEvent:Connect(function(player, action, id)
 	local data = sessions[player]
 	if not data then return end
+	if action ~= "RequestState" and player:GetAttribute("DataReady") ~= true then return end
 	local now = os.clock()
 	if now - data.lastRequest < 0.2 then return end
 	data.lastRequest = now
@@ -253,13 +255,37 @@ local function runPlot(plot)
 
 end
 local function setupPlayer(player)
-	if sessions[player] then return end
-	sessions[player] = Inventory.New()
+	if sessions[player] or loading[player] then return end
+	loading[player] = true
+	local profile, reason = Profiles.Load(player)
+	loading[player] = nil
+	if not profile then
+		warn("WarehousePrototype: could not load profile for " .. player.UserId .. ": " .. tostring(reason))
+		if player.Parent == Players then
+			player:Kick("Your progress could not be loaded safely. Please try again shortly.")
+		end
+		return
+	end
+	if player.Parent ~= Players then Profiles.Close(player); return end
+	sessions[player] = profile.Data
+	sessions[player].lastRequest = -math.huge
 	local stats = player:FindFirstChild("leaderstats") or Instance.new("Folder")
 	stats.Name = "leaderstats"; stats.Parent = player
 	local cash = stats:FindFirstChild("Cash") or Instance.new("IntValue")
 	cash.Name = "Cash"; cash.Parent = stats
-	local plot = Registry.Assign(player)
+	cash.Value = profile.Data.cash
+	local data = sessions[player]
+	profile.Snapshot = function()
+		local currentPlot = Registry.Get(player)
+		return {cash = cash.Value, inventory = data.inventory, discoveries = data.discoveries,
+			scanner = currentPlot and currentPlot.ScannerUnlocked or data.scanner, pending = data.pending}
+	end
+	local plot = Registry.Assign(player, profile.Data.scanner)
+	if profile.Recovered then
+		task.delay(3, function()
+			if player.Parent == Players then notice:FireClient(player, "Your unfinished package reward was added to Inventory.") end
+		end)
+	end
 	local function spawnAtHome(character)
 		local root = character:WaitForChild("HumanoidRootPart", 10)
 		if root and Registry.Get(player) == plot and character.Parent then
@@ -273,7 +299,8 @@ local function setupPlayer(player)
 end
 Players.PlayerAdded:Connect(setupPlayer)
 Players.PlayerRemoving:Connect(function(player)
+	Profiles.Close(player)
 	sessions[player] = nil
 	Registry.Release(player)
 end)
-for _, player in ipairs(Players:GetPlayers()) do setupPlayer(player) end
+for _, player in ipairs(Players:GetPlayers()) do task.spawn(setupPlayer, player) end

@@ -1,0 +1,91 @@
+{
+  "name": "Whats-in-the-box",
+  "tree": {
+    "$className": "DataModel",
+    "$ignoreUnknownInstances": true,
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "$ignoreUnknownInstances": true,
+      "WarehousePrototype": {
+        "$path": "src/ServerScriptService/WarehousePrototype.server.luau",
+        "$ignoreUnknownInstances": true,
+        "$properties": {
+          "Disabled": false,
+          "RunContext": "Legacy"
+        }
+      },
+      "ScannerUpgrade": {
+        "$path": "src/ServerScriptService/ScannerUpgrade.server.luau",
+        "$ignoreUnknownInstances": true,
+        "$properties": {
+          "Disabled": false,
+          "RunContext": "Legacy"
+        }
+      },
+      "WarehouseDoors": {
+        "$path": "src/ServerScriptService/WarehouseDoors.server.luau",
+        "$ignoreUnknownInstances": true,
+        "$properties": {
+          "Disabled": false,
+          "RunContext": "Legacy"
+        }
+      },
+      "PlotRegistry": {
+        "$path": "src/ServerScriptService/PlotRegistry.luau",
+        "$ignoreUnknownInstances": true
+      },
+      "InventoryState": {
+        "$path": "src/ServerScriptService/InventoryState.luau",
+        "$ignoreUnknownInstances": true
+      },
+      "InteractionRules": {
+        "$path": "src/ServerScriptService/InteractionRules.luau",
+        "$ignoreUnknownInstances": true
+      }
+    },
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "$ignoreUnknownInstances": true,
+      "StarterPlayerScripts": {
+        "$className": "StarterPlayerScripts",
+        "$ignoreUnknownInstances": true,
+        "BoxClient": {
+          "$path": "src/StarterPlayer/StarterPlayerScripts/BoxClient.client.luau",
+          "$ignoreUnknownInstances": true,
+          "$properties": {
+            "Disabled": false,
+            "RunContext": "Legacy"
+          }
+        },
+        "WarehouseNotifications": {
+          "$path": "src/StarterPlayer/StarterPlayerScripts/WarehouseNotifications.client.luau",
+          "$ignoreUnknownInstances": true,
+          "$properties": {
+            "Disabled": false,
+            "RunContext": "Legacy"
+          }
+        },
+        "WarehouseHUD": {
+          "$path": "src/StarterPlayer/StarterPlayerScripts/WarehouseHUD.client.luau",
+          "$ignoreUnknownInstances": true,
+          "$properties": {
+            "Disabled": false,
+            "RunContext": "Legacy"
+          }
+        }
+      }
+    },
+    "ReplicatedStorage": {
+      "$className": "ReplicatedStorage",
+      "$ignoreUnknownInstances": true,
+      "ItemCatalog": {
+        "$path": "src/ReplicatedStorage/ItemCatalog.luau",
+        "$ignoreUnknownInstances": true
+      },
+      "UITheme": {
+        "$path": "src/ReplicatedStorage/UITheme.luau",
+        "$ignoreUnknownInstances": true
+      }
+    }
+  }
+}

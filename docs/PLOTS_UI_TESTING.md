@@ -1,5 +1,7 @@
 # Shared plots and industrial UI — Studio test release
 
+Historical pre-persistence checks: for the current save-system update and Studio preview/live modes, see docs/PERSISTENCE_TESTING.md.
+
 This release builds on the Studio-tested door version. Original files and the previous Rojo mapping are preserved in backups/pre-plots-ui. Item names, values and probabilities remain the same. It changes runtime ownership and session inventory, so use a separate copy of your latest working Studio place for validation before adopting it.
 
 ## Get the update

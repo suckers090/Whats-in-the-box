@@ -26,7 +26,7 @@ function registry.GetAll()
 	return list
 end
 function registry.Get(player) return plots[player] end
-function registry.Assign(player)
+function registry.Assign(player, scannerUnlocked)
 	if plots[player] then return plots[player] end
 	local slot = 1
 	while slots[slot] do slot += 1 end
@@ -88,7 +88,7 @@ function registry.Assign(player)
 	label.Parent = tag
 	Instance.new("UICorner", label).CornerRadius = UDim.new(0, 10)
 	local plot = {Owner = player, Slot = slot, Model = building, Markers = localMarkers,
-		Runtime = runtime, Packages = packages, Spawn = spawn, Prizes = {}, ScannerUnlocked = false}
+		Runtime = runtime, Packages = packages, Spawn = spawn, Prizes = {}, ScannerUnlocked = scannerUnlocked == true}
 	plots[player] = plot
 	slots[slot] = player
 	building.Parent = plotsFolder
@@ -97,7 +97,7 @@ function registry.Assign(player)
 	return plot
 end
 function registry.CanInteract(plot, player, object, distance)
-	return canInteract(plot, player, plots[player], object, distance)
+	return player:GetAttribute("DataReady") == true and canInteract(plot, player, plots[player], object, distance)
 end
 function registry.Release(player)
 	local plot = plots[player]

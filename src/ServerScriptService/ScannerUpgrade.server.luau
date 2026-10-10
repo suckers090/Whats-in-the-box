@@ -15,6 +15,7 @@ end
 
 local Registry = require(script.Parent:WaitForChild("PlotRegistry"))
 local stateEvent = RS:WaitForChild("WarehouseState")
+local Profiles = require(script.Parent:WaitForChild("PlayerProfiles"))
 local function setupPlot(plot)
 	local markers = plot.Markers
 	local scannerLocation = markers.ScannerLocation
@@ -23,7 +24,7 @@ local function setupPlot(plot)
 	local packages = plot.Packages
 	local SCANNER_PRICE = 2000
 	local SEALED_PRICE = 120
-	local scannerUnlocked = false
+	local scannerUnlocked = plot.ScannerUnlocked
 
 	local function notify(player, message)
 		noticeEvent:FireClient(player, message)
@@ -206,6 +207,21 @@ local function setupPlot(plot)
 
 	packages.ChildAdded:Connect(setupBox)
 
+	local function showUnlockedScanner()
+		buildScanner()
+		purchasePad.Color = Color3.fromRGB(70, 85, 105)
+		purchasePrompt.Enabled = false
+		signText.Text = "SCANNER UNLOCKED!"
+
+		for _, box in ipairs(packages:GetChildren()) do
+			local scan = box:FindFirstChild("ScanPrompt")
+			if scan then
+				scan.Enabled = true
+			end
+		end
+
+	end
+
 	local function buyScanner(player)
 		if not Registry.CanInteract(plot, player, purchasePad, 10) then
 			notify(player, "Visit your scanner station before purchasing.")
@@ -227,19 +243,11 @@ local function setupPlot(plot)
 		cash.Value -= SCANNER_PRICE
 		scannerUnlocked = true
 		plot.ScannerUnlocked = true
+		local profile = Profiles.Get(player)
+		if profile then profile.Data.scanner = true end
 		stateEvent:FireClient(player, {scanner = true})
 
-		buildScanner()
-		purchasePad.Color = Color3.fromRGB(70, 85, 105)
-		purchasePrompt.Enabled = false
-		signText.Text = "SCANNER UNLOCKED!"
-
-		for _, box in ipairs(packages:GetChildren()) do
-			local scan = box:FindFirstChild("ScanPrompt")
-			if scan then
-				scan.Enabled = true
-			end
-		end
+		showUnlockedScanner()
 
 		notify(player, "Package Scanner unlocked!")
 		print(player.Name .. " unlocked the Package Scanner!")
@@ -247,7 +255,8 @@ local function setupPlot(plot)
 	plot.PurchaseScanner = buyScanner
 	purchasePrompt.Triggered:Connect(buyScanner)
 
-	print("Warehouse Upgrade v0.4 loaded!")
+	if scannerUnlocked then showUnlockedScanner() end
+	print("Warehouse Upgrade loaded!")
 
 end
 Registry.Added:Connect(setupPlot)

@@ -85,7 +85,21 @@ local function resizeGrid()
 end
 list:GetPropertyChangedSignal("AbsoluteSize"):Connect(resizeGrid)
 resizeGrid()
-text(panel, "SESSION PROGRESS / RESETS WHEN YOU LEAVE", 10, UDim2.new(0, 18, 1, -36), UDim2.new(1, -36, 0, 24), theme.Muted)
+local saveLabel = text(panel, "PROGRESS / LOADING", 10, UDim2.new(0, 18, 1, -36), UDim2.new(1, -36, 0, 24), theme.Muted)
+local function updateSaveStatus()
+	local status = player:GetAttribute("SaveStatus") or "Loading"
+	saveLabel.Text = status == "Studio preview" and "STUDIO PREVIEW / SAVING OFF" or ("PROGRESS / " .. string.upper(status))
+	saveLabel.TextColor3 = (status == "Save retry needed" or status == "Saving paused" or status == "Save failed")
+		and theme.Rarity.Legendary or theme.Muted
+	plotLabel.TextColor3 = saveLabel.TextColor3
+	local found = 0
+	for _, item in ipairs(catalog) do if (state.discoveries[item.id] or 0) > 0 then found += 1 end end
+	plotLabel.Text = "PLOT " .. state.plot .. " / " .. found .. " DISCOVERIES"
+	if status == "Saving paused" then plotLabel.Text = "PLOT " .. state.plot .. " / SAVE PAUSED"
+	elseif status == "Save retry needed" or status == "Save failed" then plotLabel.Text = "PLOT " .. state.plot .. " / SAVE RETRY" end
+end
+player:GetAttributeChangedSignal("SaveStatus"):Connect(updateSaveStatus)
+updateSaveStatus()
 local function card(name, detail, color, order)
 	local frame = create("Frame", {BackgroundColor3 = theme.Panel, BorderSizePixel = 0, LayoutOrder = order or 0}, list)
 	surface(frame)
@@ -109,6 +123,7 @@ local function render()
 	progress.Visible = currentTab == "Index"
 	TweenService:Create(progressFill, TweenInfo.new(0.25), {Size = UDim2.fromScale(found / #catalog, 1)}):Play()
 	plotLabel.Text = "PLOT " .. state.plot .. " / " .. found .. " DISCOVERIES"
+	updateSaveStatus()
 	if currentTab == "Index" then
 		title.Text = "COLLECTION INDEX"
 		subtitle.Text = found .. " / " .. #catalog .. " discovered  •  " .. math.floor(found / #catalog * 100) .. "% complete"
