@@ -61,6 +61,14 @@
       "PlayerProfiles": {
         "$path": "src/ServerScriptService/PlayerProfiles.luau",
         "$ignoreUnknownInstances": true
+      },
+      "WarehouseVisuals": {
+        "$path": "src/ServerScriptService/WarehouseVisuals.server.luau",
+        "$ignoreUnknownInstances": true,
+        "$properties": {
+          "Disabled": false,
+          "RunContext": "Legacy"
+        }
       }
     },
     "StarterPlayer": {
@@ -108,6 +116,10 @@
       },
       "UITheme": {
         "$path": "src/ReplicatedStorage/UITheme.luau",
+        "$ignoreUnknownInstances": true
+      },
+      "VisualConfig": {
+        "$path": "src/ReplicatedStorage/VisualConfig.luau",
         "$ignoreUnknownInstances": true
       }
     }
