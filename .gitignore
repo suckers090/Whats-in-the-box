@@ -1,0 +1,4 @@
+# Local Rojo executables and scratch builds
+/tools/
+/build/rojo-scripts-only.rbxlx
+/sourcemap.json
