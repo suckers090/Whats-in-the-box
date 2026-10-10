@@ -17,6 +17,14 @@ local function notify(player, message)
 	end
 end
 
+-- Returns only the vertical interval that remains below the fixed header.
+local function shutterSlice(centerY, height, headerY)
+	local bottom = centerY - height / 2
+	local top = math.min(centerY + height / 2, headerY)
+	local visibleHeight = math.max(0, top - bottom)
+	return visibleHeight, bottom + visibleHeight / 2
+end
+
 local function configureDoor(warehouse, panelName, title, duration, garage)
 	local panel = warehouse:FindFirstChild(panelName)
 	if not panel or not panel:IsA("BasePart") then
@@ -26,6 +34,7 @@ local function configureDoor(warehouse, panelName, title, duration, garage)
 
 	-- Parenting MeshParts does not make them follow their parent. Move every captured part.
 	local closed = panel.CFrame
+	local closedSize = panel.Size
 	local parts = {panel}
 	for _, child in ipairs(panel:GetDescendants()) do
 		if child:IsA("BasePart") then
@@ -33,8 +42,15 @@ local function configureDoor(warehouse, panelName, title, duration, garage)
 		end
 	end
 	local offsets = {}
+	local originals = {}
+	local shutterTop = closedSize.Y / 2
+	local shutterBottom = -closedSize.Y / 2
 	for _, part in ipairs(parts) do
 		offsets[part] = closed:ToObjectSpace(part.CFrame)
+		originals[part] = {Size = part.Size, Transparency = part.Transparency,
+			CanTouch = part.CanTouch, CanQuery = part.CanQuery}
+		shutterTop = math.max(shutterTop, offsets[part].Position.Y + part.Size.Y / 2)
+		shutterBottom = math.min(shutterBottom, offsets[part].Position.Y - part.Size.Y / 2)
 		part.Anchored = true
 	end
 
@@ -42,15 +58,37 @@ local function configureDoor(warehouse, panelName, title, duration, garage)
 	-- Local +Z points into the warehouse. Positive yaw swings this panel outward.
 	local hinge = closed * CFrame.new(-panel.Size.X / 2, 0, 0)
 	local hingeOffset = hinge:ToObjectSpace(closed)
-	local lift = panel.Size.Y + 0.5
 	local function pose(alpha)
-		if garage then
-			return closed * CFrame.new(0, lift * alpha, 0)
-		end
 		return hinge * CFrame.Angles(0, EMPLOYEE_OPEN_ANGLE * alpha, 0) * hingeOffset
 	end
 
-	-- A stationary control stays reachable when the garage panel lifts above the player.
+	-- Temporary roll-up illusion for the current solid panel and decorative strips.
+	-- Visible geometry stays below the closed shutter's header; no slab lifts through the roof.
+	local function retractGarage(alpha)
+		local travel = (shutterTop - shutterBottom) * alpha
+		for _, part in ipairs(parts) do
+			local original = originals[part]
+			local offset = offsets[part]
+			local centerY = offset.Position.Y + travel
+			local visibleHeight, visibleCenter = shutterSlice(centerY, original.Size.Y, shutterTop)
+			if alpha == 0 then
+				part.Size = original.Size
+				part.CFrame = closed * offset
+				part.Transparency = original.Transparency
+			elseif visibleHeight <= 0.05 then
+				-- Hidden meshes stay at their original pose, noncolliding and inside the building.
+				part.Transparency = 1
+				part.Size = original.Size
+				part.CFrame = closed * offset
+			else
+				part.Size = Vector3.new(original.Size.X, visibleHeight, original.Size.Z)
+				part.CFrame = closed * CFrame.new(offset.Position.X, visibleCenter, offset.Position.Z) * offset.Rotation
+				part.Transparency = original.Transparency
+			end
+		end
+	end
+
+	-- A stationary control stays reachable when the shutter retracts.
 	local control = Instance.new("Part")
 	control.Name = panelName .. "Control"
 	control.Size = Vector3.new(0.2, 0.2, 0.2)
@@ -85,6 +123,12 @@ local function configureDoor(warehouse, panelName, title, duration, garage)
 				part.CanCollide = false
 			end
 		end
+		if garage then
+			for _, part in ipairs(parts) do
+				part.CanTouch = enabled and originals[part].CanTouch
+				part.CanQuery = enabled and originals[part].CanQuery
+			end
+		end
 	end
 	setCollision(true)
 
@@ -100,7 +144,7 @@ local function configureDoor(warehouse, panelName, title, duration, garage)
 		params.FilterType = Enum.RaycastFilterType.Include
 		params.FilterDescendantsInstances = characters
 		local hits = workspace:GetPartBoundsInBox(closed,
-			panel.Size + Vector3.new(1, 0.5, 2), params)
+			closedSize + Vector3.new(1, 0.5, 2), params)
 		return #hits > 0
 	end
 
@@ -108,6 +152,7 @@ local function configureDoor(warehouse, panelName, title, duration, garage)
 		local driver = Instance.new("NumberValue")
 		driver.Value = from
 		local function move(alpha)
+			if garage then retractGarage(alpha); return end
 			local frame = pose(alpha)
 			for _, part in ipairs(parts) do
 				part.CFrame = frame * offsets[part]

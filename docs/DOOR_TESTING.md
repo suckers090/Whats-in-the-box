@@ -15,7 +15,7 @@ The script expects Workspace/WITB_StarterWarehousetest with direct children Empl
 ## Studio checks
 
 - Press Play. Walk to the employee door and press E (gamepad X; touch uses the prompt). The right edge as seen from outside, nearest the garage, should stay in place as the door swings outward about 90 degrees. Check that the handle follows and the frame stays still. Close it from a position clear of the opening.
-- Walk to the garage's control near its edge closest to the employee door and press E. The panel and all slats should lift together over two seconds. The prompt remains near the ground so you can close it after it opens.
+- Walk to the garage's control near its edge closest to the employee door and press E. The panel should retract beneath the header over two seconds, with slats disappearing as they reach the top. The prompt remains near the ground so you can close it after it opens.
 - Rapidly press E during either animation. Only one motion should run at a time; the prompt is disabled while moving.
 - Stand in the open doorway and try closing. It should stay open with a notification. If someone enters during closing, the door should reopen before becoming solid.
 - Closed panels now block walking through; their source snapshot had CanCollide=false. During motion and while open they are noncolliding. Handles/slats remain noncolliding decorations. These changes happen only in Play, not in your saved Studio model.
@@ -24,7 +24,7 @@ The script expects Workspace/WITB_StarterWarehousetest with direct children Empl
 
 ## Current garage movement
 
-This first version lifts the existing panel vertically, rather than articulating individual slats around an overhead track. Check the space above the frame and roof for visual overlap; send a screenshot if it clips. A realistic sectional track animation is a later refinement.
+The roof-protrusion fix now simulates roll-up retraction beneath a fixed header instead of lifting a full slab through the roof. The solid mesh contracts and slats progressively hide; it is not an articulated coil. See docs/GARAGE_RETRACTION.md for the source-only update and current validation steps.
 
 ## Adjustments
 
