@@ -1,0 +1,40 @@
+{
+  "original_file": "What's in the boxv1.rbxlx",
+  "backup_file": "backups/Whats-in-the-box-v1.rbxlx",
+  "place_sha256": "0284a9d04a8adda5d57480350fa91a09ccdddcf8453fc667ff5789c909d5a8be",
+  "scripts": [
+    {
+      "studio_path": "StarterPlayer/StarterPlayerScripts/BoxClient",
+      "class": "LocalScript",
+      "file": "src/StarterPlayer/StarterPlayerScripts/BoxClient.client.luau",
+      "disabled": false,
+      "run_context_token": "0",
+      "source_sha256": "4faceb2f3a1f1aea79806e828888c22cc085352e31af97386e03dc0903424e03"
+    },
+    {
+      "studio_path": "StarterPlayer/StarterPlayerScripts/WarehouseNotifications",
+      "class": "LocalScript",
+      "file": "src/StarterPlayer/StarterPlayerScripts/WarehouseNotifications.client.luau",
+      "disabled": false,
+      "run_context_token": "0",
+      "source_sha256": "1888cc8f8acaeadd3877c4b81c6858627d5d5d14f2c57f9299925b6e45187ca3"
+    },
+    {
+      "studio_path": "ServerScriptService/WarehousePrototype",
+      "class": "Script",
+      "file": "src/ServerScriptService/WarehousePrototype.server.luau",
+      "disabled": true,
+      "run_context_token": "0",
+      "source_sha256": "b216481fefd90013d4c5cef86a4e92b2dcd5c9091623e6d07c0d7eea5dbfddea"
+    },
+    {
+      "studio_path": "ServerScriptService/ScannerUpgrade",
+      "class": "Script",
+      "file": "src/ServerScriptService/ScannerUpgrade.server.luau",
+      "disabled": false,
+      "run_context_token": "0",
+      "source_sha256": "fd5716a358c6d55b9c78f395d9caacaf778e216a699d5a9e79da7d538b4c7619"
+    }
+  ],
+  "note": "Source text extracted without edits. XML parsing decodes XML entities and normalizes XML line endings. Instance properties remain in the original backup; these Luau files alone do not preserve Disabled or RunContext."
+}
