@@ -11,10 +11,15 @@ local presentation = require(RS:WaitForChild("Presentation"))
 local visualConfig = require(RS:WaitForChild("VisualConfig"))
 local catalog = require(RS:WaitForChild("ItemCatalog"))
 local milestones = require(RS:WaitForChild("CollectionMilestones"))
+local inventoryView = require(RS:WaitForChild("InventoryView"))
 local event = RS:WaitForChild("WarehouseState")
 local boxEvent = RS:WaitForChild("BoxEvent")
-local state = {inventory = {}, discoveries = {}, collectionClaims = {}, plot = 0, scanner = false}
+local state = {inventory = {}, discoveries = {}, collectionClaims = {}, inventoryLocks = {}, inventoryFavorites = {}, plot = 0, scanner = false}
 local currentTab, revealActive, previousSelection = nil, false, nil
+local sortIndex, filterIndex, sequence = 1, 1, 0
+local pendingRequest, saleQuote = nil, nil
+local inventoryMessage = "Locks protect every sale. Favorites are excluded from duplicate sales."
+local render
 local function create(class, properties, parent)
 	local value = Instance.new(class)
 	for key, property in pairs(properties) do value[key] = property end
@@ -93,8 +98,11 @@ local progress = create("Frame", {Position = UDim2.fromOffset(18, 92), Size = UD
 	BackgroundColor3 = theme.Raised, BorderSizePixel = 0, Visible = false}, panel)
 local progressFill = create("Frame", {Size = UDim2.fromScale(0, 1), BackgroundColor3 = theme.Accent, BorderSizePixel = 0}, progress)
 local closeButton
+local confirmLayer
 local function close()
 	shade.Visible = false
+	if confirmLayer then confirmLayer.Visible = false end
+	saleQuote = nil
 	currentTab = nil
 	GuiService.SelectedObject = previousSelection
 end
@@ -105,10 +113,74 @@ local list = create("ScrollingFrame", {Position = UDim2.fromOffset(16, 100), Siz
 local grid = create("UIGridLayout", {CellPadding = UDim2.fromOffset(10, 10), SortOrder = Enum.SortOrder.LayoutOrder}, list)
 local function resizeGrid()
 	local columns = list.AbsoluteSize.X >= 550 and 2 or 1
-	grid.CellSize = UDim2.new(1 / columns, -((columns - 1) * 10 / columns + 5), 0, 124)
+	grid.CellSize = UDim2.new(1 / columns, -((columns - 1) * 10 / columns + 5), 0, currentTab == "Inventory" and 164 or 124)
 end
 list:GetPropertyChangedSignal("AbsoluteSize"):Connect(resizeGrid)
 resizeGrid()
+local inventoryTools = create("Frame", {Name = "InventoryTools", Position = UDim2.fromOffset(18, 100),
+	Size = UDim2.new(1, -36, 0, 34), BackgroundTransparency = 1, Visible = false}, panel)
+local inventoryStatus = text(panel, "", 11, UDim2.fromOffset(18, 138), UDim2.new(1, -36, 0, 30), theme.Muted)
+inventoryStatus.Name = "InventoryStatus"; inventoryStatus.Visible = false
+local function requestInventory(action, id, options)
+	if pendingRequest then return end
+	if player:GetAttribute("DataReady") ~= true then
+		inventoryMessage = "Saving is paused. Your inventory has not changed."
+		render(); return
+	end
+	sequence += 1
+	local requestId = "inventory_" .. sequence
+	pendingRequest = {id = requestId, action = action}
+	local payload = options or {}; payload.requestId = requestId
+	inventoryMessage = "Checking with your warehouse..."
+	event:FireServer(action, id, payload)
+	render()
+	task.delay(4, function()
+		if pendingRequest and pendingRequest.id == requestId then
+			pendingRequest = nil
+			inventoryMessage = "Response delayed. Refreshing inventory; check your counts before retrying."
+			event:FireServer("RequestState")
+			render()
+		end
+	end)
+end
+local sortButton = button(inventoryTools, "", UDim2.new(), UDim2.new(1 / 3, -5, 1, 0), function()
+	if pendingRequest then return end
+	sortIndex = sortIndex % #inventoryView.Sorts + 1; render()
+end)
+local filterButton = button(inventoryTools, "", UDim2.new(1 / 3, 2, 0, 0), UDim2.new(1 / 3, -5, 1, 0), function()
+	if pendingRequest then return end
+	filterIndex = filterIndex % #inventoryView.Filters + 1; render()
+end)
+local duplicatesButton = button(inventoryTools, "SELL DUPES", UDim2.new(2 / 3, 4, 0, 0), UDim2.new(1 / 3, -5, 1, 0), function()
+	requestInventory("QuoteDuplicates")
+end)
+for _, value in ipairs({sortButton, filterButton, duplicatesButton}) do
+	value.TextScaled = true
+	create("UITextSizeConstraint", {MinTextSize = 9, MaxTextSize = 12}, value)
+end
+confirmLayer = create("Frame", {Name = "DuplicateSaleConfirmation", Size = UDim2.fromScale(1, 1),
+	BackgroundColor3 = theme.Background, BackgroundTransparency = 0.08, Active = true, Visible = false, ZIndex = 10}, panel)
+local confirmPanel = create("Frame", {AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
+	Size = UDim2.new(0.94, 0, 0, 206), BackgroundColor3 = theme.Panel, BorderSizePixel = 0, ZIndex = 11}, confirmLayer)
+surface(confirmPanel)
+local confirmTitle = text(confirmPanel, "SELL DUPLICATES?", 18, UDim2.fromOffset(16, 12), UDim2.new(1, -32, 0, 28))
+confirmTitle.ZIndex = 12
+local confirmText = text(confirmPanel, "", 14, UDim2.fromOffset(16, 48), UDim2.new(1, -32, 0, 88), theme.Muted)
+confirmText.ZIndex = 12
+local cancelSale = button(confirmPanel, "CANCEL", UDim2.new(0, 16, 1, -54), UDim2.new(0.48, -20, 0, 38), function()
+	confirmLayer.Visible = false; saleQuote = nil
+	inventoryMessage = "Sale cancelled. Nothing was sold."
+	GuiService.SelectedObject = closeButton
+	render()
+end)
+local confirmSale = button(confirmPanel, "CONFIRM SALE", UDim2.new(0.48, 4, 1, -54), UDim2.new(0.52, -20, 0, 38), function()
+	if not saleQuote or pendingRequest then return end
+	local token = saleQuote.token
+	confirmLayer.Visible = false; saleQuote = nil
+	GuiService.SelectedObject = closeButton
+	requestInventory("SellDuplicates", token)
+end)
+cancelSale.ZIndex = 13; confirmSale.ZIndex = 13
 local saveLabel = text(panel, "PROGRESS / LOADING", 10, UDim2.new(0, 18, 1, -36), UDim2.new(1, -36, 0, 24), theme.Muted)
 local function updateSaveStatus()
 	local status = player:GetAttribute("SaveStatus") or "Loading"
@@ -137,7 +209,7 @@ local function station()
 	close()
 	event:FireServer("GoScanner")
 end
-local function render()
+render = function()
 	for _, child in ipairs(list:GetChildren()) do if child:IsA("GuiObject") then child:Destroy() end end
 	local found, owned = 0, 0
 	for _, item in ipairs(catalog) do
@@ -145,6 +217,12 @@ local function render()
 		owned += state.inventory[item.id] or 0
 	end
 	progress.Visible = currentTab == "Index"
+	local inventoryOpen = currentTab == "Inventory"
+	panel.Size = inventoryOpen and UDim2.fromScale(0.94, 0.9) or UDim2.fromScale(0.92, 0.74)
+	inventoryTools.Visible = inventoryOpen; inventoryStatus.Visible = inventoryOpen
+	list.Position = UDim2.fromOffset(16, inventoryOpen and 176 or 100)
+	list.Size = UDim2.new(1, -32, 1, inventoryOpen and -224 or -148)
+	resizeGrid()
 	TweenService:Create(progressFill, TweenInfo.new(0.25), {Size = UDim2.fromScale(found / #catalog, 1)}):Play()
 	plotLabel.Text = "PLOT " .. state.plot .. " / " .. found .. " DISCOVERIES"
 	updateSaveStatus()
@@ -185,17 +263,37 @@ local function render()
 		end
 	elseif currentTab == "Inventory" then
 		title.Text = "YOUR INVENTORY"
-		subtitle.Text = owned .. " kept items  •  Sell one at a time at its shown value"
-		for index, item in ipairs(catalog) do
-			local count = state.inventory[item.id] or 0
-			if count > 0 then
-				local frame = card(item.name, item.rarity:upper() .. "  •  OWNED " .. count, theme.Rarity[item.rarity], index)
-				button(frame, "SELL ONE / $" .. item.value, UDim2.new(0, 14, 1, -40), UDim2.new(1, -28, 0, 30), function()
-					event:FireServer("SellInventory", item.id)
-				end)
+		subtitle.Text = owned .. " kept items  •  Duplicate sales keep one of each item"
+		sortButton.Text = "SORT / " .. inventoryView.Sorts[sortIndex]:upper()
+		filterButton.Text = "SHOW / " .. inventoryView.Filters[filterIndex]:upper()
+		inventoryStatus.Text = inventoryMessage
+		local ready = player:GetAttribute("DataReady") == true and pendingRequest == nil
+		duplicatesButton.Active = ready; duplicatesButton.Selectable = ready
+		duplicatesButton.Text = pendingRequest and "CHECKING..." or "SELL DUPES"
+		local rows = inventoryView.List(catalog, state.inventory, state.inventoryLocks, state.inventoryFavorites,
+			inventoryView.Sorts[sortIndex], inventoryView.Filters[filterIndex])
+		for index, row in ipairs(rows) do
+			local item = row.item
+			local frame = card(item.name, item.rarity:upper() .. "  •  OWNED " .. row.count .. "  •  $" .. item.value
+				.. (row.locked and "\nLOCKED / protected from selling" or (row.favorite and "\nFAVORITE / kept out of duplicate sales" or "")), theme.Rarity[item.rarity], index)
+			local lock = button(frame, row.locked and "UNLOCK" or "LOCK", UDim2.new(0, 14, 1, -78), UDim2.new(0.48, -18, 0, 30), function()
+				requestInventory("SetInventoryFlag", item.id, {flag = "Lock", enabled = not row.locked})
+			end)
+			local favorite = button(frame, row.favorite and "UNFAVORITE" or "FAVORITE", UDim2.new(0.48, 0, 1, -78), UDim2.new(0.52, -14, 0, 30), function()
+				requestInventory("SetInventoryFlag", item.id, {flag = "Favorite", enabled = not row.favorite})
+			end)
+			local sell = button(frame, row.locked and "LOCKED" or ("SELL ONE / $" .. item.value), UDim2.new(0, 14, 1, -40), UDim2.new(1, -28, 0, 30), function()
+				if not row.locked then requestInventory("SellInventory", item.id) end
+			end)
+			for _, value in ipairs({lock, favorite, sell}) do
+				value.Active = ready and (value ~= sell or not row.locked); value.Selectable = value.Active
+				value.TextColor3 = value.Active and theme.Text or theme.Muted
+				value.TextScaled = true
+				create("UITextSizeConstraint", {MinTextSize = 9, MaxTextSize = 12}, value)
 			end
 		end
 		if owned == 0 then card("Nothing kept yet", "Open a package and choose KEEP.\nYour finds will appear here.") end
+		if owned > 0 and #rows == 0 then card("No matching items", "Change SHOW to view the rest of your inventory.") end
 	elseif currentTab == "Scanner" or currentTab == "Upgrades" then
 		title.Text = currentTab == "Scanner" and "PACKAGE SCANNER" or "WAREHOUSE UPGRADES"
 		subtitle.Text = "Equipment belongs to your warehouse"
@@ -212,11 +310,16 @@ local function render()
 		button(frame, "OPEN INVENTORY", UDim2.new(0, 14, 1, -40), UDim2.new(1, -28, 0, 30), function() currentTab = "Inventory"; render() end)
 		card("Sealed packages / $120", "Use F beside your own unopened package.\nYou decide whether to reveal or sell.", theme.Muted, 2)
 	end
+	if shade.Visible and not revealActive and not confirmLayer.Visible then
+		local selection = GuiService.SelectedObject
+		if not selection or not selection.Parent then GuiService.SelectedObject = closeButton end
+	end
 end
 local function open(tab)
 	if revealActive then return end
 	if shade.Visible and currentTab == tab then close(); return end
 	previousSelection = GuiService.SelectedObject
+	confirmLayer.Visible = false; saleQuote = nil
 	currentTab = tab
 	render()
 	shade.Visible = true
@@ -239,12 +342,50 @@ UserInputService.InputBegan:Connect(function(input, processed)
 	elseif input.KeyCode == Enum.KeyCode.Escape and shade.Visible then close() end
 end)
 event.OnClientEvent:Connect(function(snapshot)
+	if snapshot.inventoryResponse then
+		local response = snapshot.inventoryResponse
+		if not pendingRequest or response.requestId ~= pendingRequest.id then return end
+		pendingRequest = nil
+		inventoryMessage = response.message
+		render()
+		if response.success and response.quote and currentTab == "Inventory" and shade.Visible then
+			saleQuote = response.quote
+			confirmText.Text = saleQuote.count .. " duplicate items / $" .. saleQuote.value
+				.. "\n\nOne of each item stays. Locked and favorite stacks are excluded. Quote lasts 20 seconds."
+			confirmLayer.Visible = true
+			GuiService.SelectedObject = cancelSale
+			local token = saleQuote.token
+			task.delay(20, function()
+				if saleQuote and saleQuote.token == token then
+					saleQuote = nil; confirmLayer.Visible = false
+					inventoryMessage = "Quote expired. Review a new duplicates quote."
+					GuiService.SelectedObject = closeButton
+					render()
+				end
+			end)
+		end
+		return
+	end
+	if snapshot.inventory or snapshot.inventoryLocks or snapshot.inventoryFavorites then
+		if saleQuote then inventoryMessage = "Inventory updated. Review a new duplicates quote." end
+		if confirmLayer.Visible then GuiService.SelectedObject = closeButton end
+		saleQuote = nil; confirmLayer.Visible = false
+	end
 	for key, value in pairs(snapshot) do state[key] = value end
+	render()
+end)
+player:GetAttributeChangedSignal("DataReady"):Connect(function()
+	if player:GetAttribute("DataReady") ~= true then
+		if confirmLayer.Visible then GuiService.SelectedObject = closeButton end
+		saleQuote = nil; confirmLayer.Visible = false
+		inventoryMessage = "Saving is paused. Your inventory has not changed."
+	else inventoryMessage = "Locks protect every sale. Favorites are excluded from duplicate sales." end
 	render()
 end)
 boxEvent.OnClientEvent:Connect(function(action)
 	if action == "Reveal" then
 		revealActive = true
+		confirmLayer.Visible = false; saleQuote = nil
 		if shade.Visible then shade.Visible = false; currentTab = nil end
 	elseif action == "Closed" then revealActive = false end
 end)

@@ -1,0 +1,203 @@
+{
+  "name": "Whats-in-the-box",
+  "tree": {
+    "$className": "DataModel",
+    "$ignoreUnknownInstances": true,
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "$ignoreUnknownInstances": true,
+      "WarehousePrototype": {
+        "$path": "src/ServerScriptService/WarehousePrototype.server.luau",
+        "$ignoreUnknownInstances": true,
+        "$properties": {
+          "Disabled": false,
+          "RunContext": "Legacy"
+        }
+      },
+      "ScannerUpgrade": {
+        "$path": "src/ServerScriptService/ScannerUpgrade.server.luau",
+        "$ignoreUnknownInstances": true,
+        "$properties": {
+          "Disabled": false,
+          "RunContext": "Legacy"
+        }
+      },
+      "WarehouseDoors": {
+        "$path": "src/ServerScriptService/WarehouseDoors.server.luau",
+        "$ignoreUnknownInstances": true,
+        "$properties": {
+          "Disabled": false,
+          "RunContext": "Legacy"
+        }
+      },
+      "PlotRegistry": {
+        "$path": "src/ServerScriptService/PlotRegistry.luau",
+        "$ignoreUnknownInstances": true
+      },
+      "InventoryState": {
+        "$path": "src/ServerScriptService/InventoryState.luau",
+        "$ignoreUnknownInstances": true
+      },
+      "CollectionProgress": {
+        "$path": "src/ServerScriptService/CollectionProgress.luau",
+        "$ignoreUnknownInstances": true
+      },
+      "InteractionRules": {
+        "$path": "src/ServerScriptService/InteractionRules.luau",
+        "$ignoreUnknownInstances": true
+      },
+      "PersistenceConfig": {
+        "$path": "src/ServerScriptService/PersistenceConfig.luau",
+        "$ignoreUnknownInstances": true
+      },
+      "ProfileSchema": {
+        "$path": "src/ServerScriptService/ProfileSchema.luau",
+        "$ignoreUnknownInstances": true
+      },
+      "ProfileTransactions": {
+        "$path": "src/ServerScriptService/ProfileTransactions.luau",
+        "$ignoreUnknownInstances": true
+      },
+      "PlayerProfiles": {
+        "$path": "src/ServerScriptService/PlayerProfiles.luau",
+        "$ignoreUnknownInstances": true
+      },
+      "WarehouseVisuals": {
+        "$path": "src/ServerScriptService/WarehouseVisuals.server.luau",
+        "$ignoreUnknownInstances": true,
+        "$properties": {
+          "Disabled": false,
+          "RunContext": "Legacy"
+        }
+      },
+      "YardLayout": {
+        "$path": "src/ServerScriptService/YardLayout.luau",
+        "$ignoreUnknownInstances": true
+      },
+      "WarehouseExterior": {
+        "$path": "src/ServerScriptService/WarehouseExterior.server.luau",
+        "$ignoreUnknownInstances": true,
+        "$properties": {
+          "Disabled": false,
+          "RunContext": "Legacy"
+        }
+      },
+      "WarehouseVisualBuilder": {
+        "$path": "src/ServerScriptService/WarehouseVisualBuilder.luau",
+        "$ignoreUnknownInstances": true
+      },
+      "WarehouseExteriorBuilder": {
+        "$path": "src/ServerScriptService/WarehouseExteriorBuilder.luau",
+        "$ignoreUnknownInstances": true
+      },
+      "FacilityLayout": {
+        "$path": "src/ServerScriptService/FacilityLayout.luau"
+      },
+      "FacilityPolish": {
+        "$path": "src/ServerScriptService/FacilityPolish.luau"
+      }
+    },
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "$ignoreUnknownInstances": true,
+      "StarterPlayerScripts": {
+        "$className": "StarterPlayerScripts",
+        "$ignoreUnknownInstances": true,
+        "BoxClient": {
+          "$path": "src/StarterPlayer/StarterPlayerScripts/BoxClient.client.luau",
+          "$ignoreUnknownInstances": true,
+          "$properties": {
+            "Disabled": false,
+            "RunContext": "Legacy"
+          }
+        },
+        "WarehouseNotifications": {
+          "$path": "src/StarterPlayer/StarterPlayerScripts/WarehouseNotifications.client.luau",
+          "$ignoreUnknownInstances": true,
+          "$properties": {
+            "Disabled": false,
+            "RunContext": "Legacy"
+          }
+        },
+        "WarehouseHUD": {
+          "$path": "src/StarterPlayer/StarterPlayerScripts/WarehouseHUD.client.luau",
+          "$ignoreUnknownInstances": true,
+          "$properties": {
+            "Disabled": false,
+            "RunContext": "Legacy"
+          }
+        },
+        "DoorAudio": {
+          "$path": "src/StarterPlayer/StarterPlayerScripts/DoorAudio.client.luau",
+          "$ignoreUnknownInstances": true,
+          "$properties": {
+            "Disabled": false,
+            "RunContext": "Legacy"
+          }
+        }
+      }
+    },
+    "ReplicatedStorage": {
+      "$className": "ReplicatedStorage",
+      "$ignoreUnknownInstances": true,
+      "ItemCatalog": {
+        "$path": "src/ReplicatedStorage/ItemCatalog.luau",
+        "$ignoreUnknownInstances": true
+      },
+      "CollectionMilestones": {
+        "$path": "src/ReplicatedStorage/CollectionMilestones.luau",
+        "$ignoreUnknownInstances": true
+      },
+      "UITheme": {
+        "$path": "src/ReplicatedStorage/UITheme.luau",
+        "$ignoreUnknownInstances": true
+      },
+      "VisualConfig": {
+        "$path": "src/ReplicatedStorage/VisualConfig.luau",
+        "$ignoreUnknownInstances": true
+      },
+      "UIStyle": {
+        "$path": "src/ReplicatedStorage/UIStyle.luau",
+        "$ignoreUnknownInstances": true
+      },
+      "Presentation": {
+        "$path": "src/ReplicatedStorage/Presentation.luau",
+        "$ignoreUnknownInstances": true
+      },
+      "RevealStyle": {
+        "$path": "src/ReplicatedStorage/RevealStyle.luau",
+        "$ignoreUnknownInstances": true
+      }
+    },
+    "ServerStorage": {
+      "$className": "ServerStorage",
+      "$ignoreUnknownInstances": true,
+      "WITBVisualTools": {
+        "$path": "studio-tools/VisualTools.plugin.luau",
+        "$ignoreUnknownInstances": true,
+        "$properties": {
+          "Disabled": false,
+          "RunContext": "Legacy"
+        },
+        "VisualBake": {
+          "$path": "studio-tools/VisualBake.luau"
+        },
+        "WarehouseVisualBuilder": {
+          "$path": "src/ServerScriptService/WarehouseVisualBuilder.luau"
+        },
+        "WarehouseExteriorBuilder": {
+          "$path": "src/ServerScriptService/WarehouseExteriorBuilder.luau"
+        },
+        "YardLayout": {
+          "$path": "src/ServerScriptService/YardLayout.luau"
+        },
+        "FacilityLayout": {
+          "$path": "src/ServerScriptService/FacilityLayout.luau"
+        },
+        "FacilityPolish": {
+          "$path": "src/ServerScriptService/FacilityPolish.luau"
+        }
+      }
+    }
+  }
+}

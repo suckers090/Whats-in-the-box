@@ -2,6 +2,10 @@
 
 Existing Roblox warehouse mystery-package game.
 
+The [inventory control milestone](docs/INVENTORY_CONTROL.md) adds saved locks and
+favorites, sorting/filtering, confirmed duplicate sales and receipt-aware package
+choices. See the refreshed [mechanics audit and roadmap](docs/GAMEPLAY_ROADMAP.md).
+
 The [logistics facility polish](docs/FACILITY_POLISH.md) adds parked vans, freight
 staging, waste/utilities, sidewalks, fencing and distant depots with neutral daylight.
 Use the additive Polish facility toolbar action to retain your existing baked edits.

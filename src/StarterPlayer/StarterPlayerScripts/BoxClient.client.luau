@@ -99,6 +99,8 @@ world.Parent = viewport
 
 local itemName = label("ItemName", "", 0.68, 0.085)
 local valueLabel = label("Value", "", 0.77, 0.07)
+local choiceStatus = label("ChoiceStatus", "", 0.84, 0.035)
+choiceStatus.TextColor3 = theme.Muted
 
 local function button(name, title, x, color)
 	local b = Instance.new("TextButton")
@@ -130,7 +132,25 @@ local sellButton = button(
 local currentModel = nil
 local rotation = 0
 local waiting = false
+local rewardToken, rewardLocked = nil, false
 local previousSelection = nil
+local function refreshChoices()
+	local ready = player:GetAttribute("DataReady") == true and not waiting
+	keepButton.Active = ready; keepButton.Selectable = ready
+	sellButton.Active = ready and not rewardLocked; sellButton.Selectable = ready and not rewardLocked
+	keepButton.Text = waiting and "WAIT..." or "KEEP"
+	sellButton.Text = rewardLocked and "LOCKED" or "SELL"
+	keepButton.TextColor3 = ready and theme.Text or theme.Muted
+	sellButton.TextColor3 = sellButton.Active and theme.Text or theme.Muted
+	if backdrop.Visible and ready and not GuiService.SelectedObject then GuiService.SelectedObject = keepButton end
+end
+player:GetAttributeChangedSignal("DataReady"):Connect(function()
+	refreshChoices()
+	if backdrop.Visible then
+		choiceStatus.Text = player:GetAttribute("DataReady") == true
+			and (rewardLocked and "LOCKED / CHOOSE KEEP" or "") or "SAVE PAUSED / PLEASE WAIT"
+	end
+end)
 
 -- Build simple 3D item models
 local function buildItem(name)
@@ -241,8 +261,10 @@ end)
 
 local function choose(decision)
 	if not backdrop.Visible or waiting then return end
+	if player:GetAttribute("DataReady") ~= true or (decision == "Sell" and rewardLocked) then return end
 	waiting = true
-	event:FireServer(decision)
+	refreshChoices()
+	event:FireServer(decision, rewardToken)
 end
 
 keepButton.Activated:Connect(function()
@@ -256,6 +278,10 @@ end)
 event.OnClientEvent:Connect(function(action, data)
 	if action == "Reveal" then
 		waiting = false
+		rewardToken = data.token; rewardLocked = data.locked == true
+		choiceStatus.Text = player:GetAttribute("DataReady") ~= true and "SAVE PAUSED / PLEASE WAIT"
+			or (rewardLocked and "LOCKED / CHOOSE KEEP" or "")
+		refreshChoices()
 
 		local color = colors[data.rarity]
 			or Color3.new(1, 1, 1)
@@ -292,16 +318,29 @@ event.OnClientEvent:Connect(function(action, data)
 		GuiService.SelectedObject = keepButton
 
 	elseif action == "Closed" then
+		if data and data.token ~= rewardToken then return end
 		backdrop.Visible = false
 		waiting = false
+		rewardToken = nil; rewardLocked = false
 		currentModel = nil
 		world:ClearAllChildren()
 
 		if GuiService.SelectedObject == keepButton
 			or GuiService.SelectedObject == sellButton then
-			GuiService.SelectedObject = previousSelection
+			local visible = previousSelection and previousSelection.Parent ~= nil
+			local ancestor = previousSelection
+			while visible and ancestor do
+				if ancestor:IsA("GuiObject") and not ancestor.Visible then visible = false end
+				ancestor = ancestor.Parent
+			end
+			GuiService.SelectedObject = visible and previousSelection or nil
 		end
 
+	elseif action == "DecisionFailed" then
+		if not data or data.token ~= rewardToken then return end
+		waiting = false
+		choiceStatus.Text = rewardLocked and "LOCKED / CHOOSE KEEP" or "CHOICE NOT SAVED / TRY AGAIN"
+		refreshChoices()
 	elseif action == "Message" then
 		warn(data)
 	end

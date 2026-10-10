@@ -2,6 +2,7 @@
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local RS = game:GetService("ReplicatedStorage")
+local HttpService = game:GetService("HttpService")
 local Registry = require(script.Parent:WaitForChild("PlotRegistry"))
 local items = require(RS:WaitForChild("ItemCatalog"))
 local function remote(name)
@@ -16,6 +17,8 @@ local rng = Random.new()
 local sessions, loading = {}, {}
 local Profiles = require(script.Parent:WaitForChild("PlayerProfiles"))
 local Inventory = require(script.Parent:WaitForChild("InventoryState"))(items)
+local InventoryActions = require(script.Parent:WaitForChild("InventoryActions"))(Inventory, os.clock,
+	function() return HttpService:GenerateGUID(false) end)
 local Collection = require(script.Parent:WaitForChild("CollectionProgress"))(items,
 	require(RS:WaitForChild("CollectionMilestones")))
 local function pushState(player)
@@ -25,6 +28,7 @@ local function pushState(player)
 	stateEvent:FireClient(player, {
 		inventory = data.inventory, discoveries = data.discoveries,
 		collectionClaims = data.collectionClaims,
+		inventoryLocks = data.inventoryLocks, inventoryFavorites = data.inventoryFavorites,
 		plot = plot and plot.Slot or 0, scanner = plot and plot.ScannerUnlocked or false,
 	})
 end
@@ -36,18 +40,55 @@ local function randomItem()
 	end
 	return items[1]
 end
-boxEvent.OnServerEvent:Connect(function(player, decision)
-	local data = sessions[player]
-	if not data or player:GetAttribute("DataReady") ~= true then return end
-	local earned = Inventory.Resolve(data, decision)
-	if earned == nil then return end
-	player.leaderstats.Cash.Value += earned
-	boxEvent:FireClient(player, "Closed")
-	pushState(player)
-end)
-stateEvent.OnServerEvent:Connect(function(player, action, id)
+boxEvent.OnServerEvent:Connect(function(player, decision, token)
 	local data = sessions[player]
 	if not data then return end
+	local function rejected(message)
+		boxEvent:FireClient(player, "DecisionFailed", {token = type(token) == "string" and #token <= 64 and token or nil, message = message})
+		if data.rewardToken and token == data.rewardToken then notice:FireClient(player, message) end
+	end
+	-- A decision belongs to one revealed reward. An old click or forged choice must
+	-- not consume a later package, or resolve a reward before its reveal arrives.
+	if type(token) ~= "string" or token ~= data.rewardToken then rejected("This reward choice is no longer active."); return end
+	if player:GetAttribute("DataReady") ~= true then
+		rejected("Saving is paused. Your reward is still here; try again when saving resumes.")
+		return
+	end
+	local earned, reason = Inventory.Resolve(data, decision, 1000000000000 - player.leaderstats.Cash.Value)
+	if earned == nil then
+		rejected(reason or "No reward choice is available.")
+		return
+	end
+	data.rewardToken = nil
+	player.leaderstats.Cash.Value += earned
+	boxEvent:FireClient(player, "Closed", {token = token})
+	pushState(player)
+end)
+stateEvent.OnServerEvent:Connect(function(player, action, id, payload)
+	local data = sessions[player]
+	if not data then return end
+	if InventoryActions.Supports(action) then
+		local requestId = type(payload) == "table" and payload.requestId
+		if type(requestId) ~= "string" or #requestId > 64 then requestId = nil end
+		local stats = player:FindFirstChild("leaderstats")
+		local cash = stats and stats:FindFirstChild("Cash")
+		local result
+		if player:GetAttribute("DataReady") ~= true then
+			result = {success = false, message = "Saving is paused. Your inventory has not changed."}
+		elseif not cash then
+			result = {success = false, message = "Inventory is still loading. Please try again."}
+		else
+			result = InventoryActions.Run(data, cash.Value, action, id, payload)
+			if result.success then
+				if result.cashDelta then cash.Value += result.cashDelta end
+				if action ~= "QuoteDuplicates" then pushState(player) end
+				if result.cashDelta then notice:FireClient(player, result.message) end
+			end
+		end
+		result.requestId = requestId
+		stateEvent:FireClient(player, {inventoryResponse = result})
+		return
+	end
 	if action ~= "RequestState" and player:GetAttribute("DataReady") ~= true then return end
 	local now = os.clock()
 	if now - data.lastRequest < 0.2 then return end
@@ -60,12 +101,6 @@ stateEvent.OnServerEvent:Connect(function(player, action, id)
 		player.leaderstats.Cash.Value += earned
 		pushState(player)
 		notice:FireClient(player, "Collection milestone / +$" .. earned)
-	elseif action == "SellInventory" then
-		local earned = Inventory.Sell(data, id)
-		if earned == nil then return end
-		player.leaderstats.Cash.Value += earned
-		pushState(player)
-		notice:FireClient(player, "Item sold for $" .. earned)
 	elseif action == "BuyScanner" then
 		local plot = Registry.Get(player)
 		if plot and plot.PurchaseScanner then plot.PurchaseScanner(player) end
@@ -206,11 +241,7 @@ local function runPlot(plot)
 			end
 
 			if sessions[player].pending then
-				boxEvent:FireClient(
-					player,
-					"Message",
-					"Choose KEEP or SELL first!"
-				)
+				notice:FireClient(player, "Choose KEEP or SELL for your current find before opening another package.")
 				return
 			end
 
@@ -224,6 +255,8 @@ local function runPlot(plot)
 			local item = prize
 			local isNew = (sessions[player].discoveries[item.id] or 0) == 0
 			Inventory.Discover(sessions[player], item.id)
+			local token = HttpService:GenerateGUID(false)
+			sessions[player].rewardToken = token
 			pushState(player)
 
 			-- BOX REVEAL EFFECT
@@ -245,6 +278,7 @@ local function runPlot(plot)
 			-- SEND ITEM TO PLAYER
 			if player.Parent == Players then
 				boxEvent:FireClient(player, "Reveal", {
+					id = item.id, token = token, locked = sessions[player].inventoryLocks[item.id] == true,
 					name = item.name,
 					value = item.value,
 					rarity = item.rarity,
@@ -364,7 +398,8 @@ local function setupPlayer(player)
 		local currentPlot = Registry.Get(player)
 		return {cash = cash.Value, inventory = data.inventory, discoveries = data.discoveries,
 			scanner = currentPlot and currentPlot.ScannerUnlocked or data.scanner, pending = data.pending,
-			collectionClaims = data.collectionClaims}
+			collectionClaims = data.collectionClaims, inventoryLocks = data.inventoryLocks,
+			inventoryFavorites = data.inventoryFavorites}
 	end
 	local plot = Registry.Assign(player, profile.Data.scanner)
 	if profile.Recovered then

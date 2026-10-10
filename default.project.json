@@ -95,6 +95,10 @@
       },
       "FacilityPolish": {
         "$path": "src/ServerScriptService/FacilityPolish.luau"
+      },
+      "InventoryActions": {
+        "$path": "src/ServerScriptService/InventoryActions.luau",
+        "$ignoreUnknownInstances": true
       }
     },
     "StarterPlayer": {
@@ -166,6 +170,10 @@
       },
       "RevealStyle": {
         "$path": "src/ReplicatedStorage/RevealStyle.luau",
+        "$ignoreUnknownInstances": true
+      },
+      "InventoryView": {
+        "$path": "src/ReplicatedStorage/InventoryView.luau",
         "$ignoreUnknownInstances": true
       }
     },

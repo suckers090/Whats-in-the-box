@@ -4,7 +4,8 @@ return function(catalog)
 	for _, item in ipairs(catalog) do known[item.id] = true end
 	local schema = {}
 	function schema.New()
-		return {cash = 0, inventory = {}, discoveries = {}, scanner = false, pending = nil, collectionClaims = {}}
+		return {cash = 0, inventory = {}, discoveries = {}, scanner = false, pending = nil,
+			collectionClaims = {}, inventoryLocks = {}, inventoryFavorites = {}}
 	end
 	local function integer(value, limit)
 		return type(value) == "number" and value == value and value >= 0 and value <= limit and value % 1 == 0
@@ -19,6 +20,17 @@ return function(catalog)
 		end
 		return copy
 	end
+	local function flags(source)
+		local copy, size = {}, 0
+		if source == nil then return copy end -- Additive migration of existing v1 profiles.
+		if type(source) ~= "table" then return nil end
+		for id, enabled in pairs(source) do
+			size += 1
+			if size > 256 or type(id) ~= "string" or #id < 1 or #id > 64 or enabled ~= true then return nil end
+			copy[id] = true -- Retain valid unknown IDs and copy before a yielding save.
+		end
+		return copy
+	end
 	function schema.Validate(data)
 		if type(data) ~= "table" or not integer(data.cash, 1000000000000) or type(data.scanner) ~= "boolean" then
 			return nil, "Invalid cash or upgrade data"
@@ -28,21 +40,13 @@ return function(catalog)
 		if data.pending ~= nil and (type(data.pending) ~= "string" or not known[data.pending]) then
 			return nil, "Unknown pending reward"
 		end
-		-- Old v1 saves have no claims field. Preserve valid future milestone IDs.
-		local claims = {}
-		if data.collectionClaims ~= nil then
-			if type(data.collectionClaims) ~= "table" then return nil, "Invalid collection claims" end
-			local size = 0
-			for id, claimed in pairs(data.collectionClaims) do
-				size += 1
-				if size > 256 or type(id) ~= "string" or #id < 1 or #id > 64 or claimed ~= true then
-					return nil, "Invalid collection claims"
-				end
-				claims[id] = true
-			end
-		end
+		local claims = flags(data.collectionClaims)
+		if not claims then return nil, "Invalid collection claims" end
+		local locks, favorites = flags(data.inventoryLocks), flags(data.inventoryFavorites)
+		if not locks or not favorites then return nil, "Invalid inventory preferences" end
 		return {cash = data.cash, inventory = inventory, discoveries = discoveries,
-			scanner = data.scanner, pending = data.pending, collectionClaims = claims}
+			scanner = data.scanner, pending = data.pending, collectionClaims = claims,
+			inventoryLocks = locks, inventoryFavorites = favorites}
 	end
 	function schema.Recover(data)
 		local copy, reason = schema.Validate(data)
