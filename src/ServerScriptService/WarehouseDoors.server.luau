@@ -3,17 +3,12 @@ local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local WAREHOUSE_NAME = "WITB_StarterWarehousetest"
 local INTERACTION_DISTANCE = 12
 local EMPLOYEE_OPEN_ANGLE = math.rad(90)
 local EMPLOYEE_DURATION = 0.8
 local GARAGE_DURATION = 2
 
-local warehouse = workspace:WaitForChild(WAREHOUSE_NAME, 15)
-if not warehouse or not warehouse:IsA("Model") then
-	warn("WarehouseDoors: missing Workspace." .. WAREHOUSE_NAME)
-	return
-end
+local Registry = require(script.Parent:WaitForChild("PlotRegistry"))
 
 local function notify(player, message)
 	local event = ReplicatedStorage:FindFirstChild("WarehouseNotice")
@@ -22,7 +17,7 @@ local function notify(player, message)
 	end
 end
 
-local function configureDoor(panelName, title, duration, garage)
+local function configureDoor(warehouse, panelName, title, duration, garage)
 	local panel = warehouse:FindFirstChild(panelName)
 	if not panel or not panel:IsA("BasePart") then
 		warn("WarehouseDoors: missing panel " .. panelName)
@@ -164,5 +159,9 @@ local function configureDoor(panelName, title, duration, garage)
 	end)
 end
 
-configureDoor("EmployeeDoor_panel", "Employee Door", EMPLOYEE_DURATION, false)
-configureDoor("GarageDoor_Panel", "Garage Door", GARAGE_DURATION, true)
+local function setupPlot(plot)
+	configureDoor(plot.Model, "EmployeeDoor_panel", "Employee Door", EMPLOYEE_DURATION, false)
+	configureDoor(plot.Model, "GarageDoor_Panel", "Garage Door", GARAGE_DURATION, true)
+end
+Registry.Added:Connect(setupPlot)
+for _, plot in ipairs(Registry.GetAll()) do setupPlot(plot) end

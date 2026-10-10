@@ -29,6 +29,18 @@
           "Disabled": false,
           "RunContext": "Legacy"
         }
+      },
+      "PlotRegistry": {
+        "$path": "src/ServerScriptService/PlotRegistry.luau",
+        "$ignoreUnknownInstances": true
+      },
+      "InventoryState": {
+        "$path": "src/ServerScriptService/InventoryState.luau",
+        "$ignoreUnknownInstances": true
+      },
+      "InteractionRules": {
+        "$path": "src/ServerScriptService/InteractionRules.luau",
+        "$ignoreUnknownInstances": true
       }
     },
     "StarterPlayer": {
@@ -52,7 +64,27 @@
             "Disabled": false,
             "RunContext": "Legacy"
           }
+        },
+        "WarehouseHUD": {
+          "$path": "src/StarterPlayer/StarterPlayerScripts/WarehouseHUD.client.luau",
+          "$ignoreUnknownInstances": true,
+          "$properties": {
+            "Disabled": false,
+            "RunContext": "Legacy"
+          }
         }
+      }
+    },
+    "ReplicatedStorage": {
+      "$className": "ReplicatedStorage",
+      "$ignoreUnknownInstances": true,
+      "ItemCatalog": {
+        "$path": "src/ReplicatedStorage/ItemCatalog.luau",
+        "$ignoreUnknownInstances": true
+      },
+      "UITheme": {
+        "$path": "src/ReplicatedStorage/UITheme.luau",
+        "$ignoreUnknownInstances": true
       }
     }
   }

@@ -76,3 +76,5 @@ Changes made by Codex reach your local files through GitHub, not automatically t
 Rojo 7.5.1 successfully built the project and generated a sourcemap. The build contains exactly the four intended scripts with byte-equivalent decoded source, Disabled=false and Legacy RunContext. The serve API returned the expected hierarchy and ignoreUnknownInstances=true at every mapped node. The temporary cloud server was stopped after validation. No first-sync or gameplay test in Studio was performed by the assistant.
 
 The current mapping also includes WarehouseDoors. The checks above describe the initial four-script Rojo setup; the door update separately passed compilation and a five-script Rojo build.
+
+For the newer shared-plot/UI release, follow docs/PLOTS_UI_TESTING.md. Its server and shared modules plus WarehouseHUD are additional mapped nodes; the earlier setup checklist describes the initial version. Preserve your latest Studio place and local edits when updating.

@@ -11,12 +11,8 @@ local GuiService = game:GetService("GuiService")
 local player = Players.LocalPlayer
 local event = RS:WaitForChild("BoxEvent")
 
-local colors = {
-	Common = Color3.fromRGB(180, 185, 195),
-	Uncommon = Color3.fromRGB(60, 220, 110),
-	Rare = Color3.fromRGB(65, 145, 255),
-	Legendary = Color3.fromRGB(255, 190, 45)
-}
+local theme = require(RS:WaitForChild("UITheme"))
+local colors = theme.Rarity
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "BoxRevealUI"
@@ -36,7 +32,7 @@ frame.Name = "RevealPanel"
 frame.AnchorPoint = Vector2.new(0.5, 0.5)
 frame.Position = UDim2.fromScale(0.5, 0.5)
 frame.Size = UDim2.fromScale(0.88, 0.75)
-frame.BackgroundColor3 = Color3.fromRGB(24, 29, 43)
+frame.BackgroundColor3 = theme.Background
 frame.Parent = backdrop
 
 Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 16)
@@ -66,13 +62,17 @@ end
 
 label("Title", "PACKAGE OPENED!", 0.03, 0.09)
 local rarityLabel = label("Rarity", "", 0.13, 0.09)
+local revealStroke = Instance.new("UIStroke")
+revealStroke.Thickness = 2
+revealStroke.Transparency = 0.35
+revealStroke.Parent = frame
 
 -- 3D item display
 local viewport = Instance.new("ViewportFrame")
 viewport.Name = "ItemPreview"
 viewport.Size = UDim2.fromScale(0.86, 0.43)
 viewport.Position = UDim2.fromScale(0.07, 0.24)
-viewport.BackgroundColor3 = Color3.fromRGB(35, 42, 60)
+viewport.BackgroundColor3 = theme.Panel
 viewport.BorderSizePixel = 0
 viewport.Ambient = Color3.fromRGB(190, 190, 190)
 viewport.LightColor = Color3.new(1, 1, 1)
@@ -113,12 +113,12 @@ end
 
 local keepButton = button(
 	"Keep", "KEEP", 0.05,
-	Color3.fromRGB(50, 120, 220)
+	theme.Accent
 )
 
 local sellButton = button(
 	"Sell", "SELL", 0.53,
-	Color3.fromRGB(40, 175, 95)
+	theme.Success
 )
 
 local currentModel = nil
@@ -254,13 +254,16 @@ event.OnClientEvent:Connect(function(action, data)
 		local color = colors[data.rarity]
 			or Color3.new(1, 1, 1)
 
+		revealStroke.Color = color
+		revealStroke.Transparency = 0.05
+		TweenService:Create(revealStroke, TweenInfo.new(0.6), {Transparency = 0.4}):Play()
 		rarityLabel.Text = string.upper(data.rarity)
 		rarityLabel.TextColor3 = color
 		itemName.Text = data.name
 		valueLabel.Text = "VALUE: $" .. data.value
 		valueLabel.TextColor3 = color
 		viewport.BackgroundColor3 =
-			Color3.fromRGB(35, 42, 60)
+			theme.Panel
 
 		buildItem(data.name)
 
@@ -269,7 +272,7 @@ event.OnClientEvent:Connect(function(action, data)
 		scale.Scale = 0.8
 		TweenService:Create(
 			scale,
-			TweenInfo.new(0.3, Enum.EasingStyle.Back),
+			TweenInfo.new(data.rarity == "Legendary" and 0.6 or 0.3, Enum.EasingStyle.Back),
 			{Scale = 1}
 		):Play()
 
