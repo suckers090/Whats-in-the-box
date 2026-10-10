@@ -61,15 +61,43 @@ local function decorate(plot)
 	end
 	local function label(parent, message, face, color)
 		local gui = Instance.new("SurfaceGui")
-		gui.Face = face or Enum.NormalId.Front; gui.CanvasSize = Vector2.new(600, 180)
+		gui.Face = face or Enum.NormalId.Front
+		-- Uniform pixels per stud prevents square crates and thin floor signs
+		-- from stretching the same fixed 600x180 canvas into different shapes.
+		gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+		gui.PixelsPerStud = 80
 		gui.MaxDistance = 90; gui.LightInfluence = 0.3; gui.Parent = parent
 		local text = Instance.new("TextLabel")
 		text.Size = UDim2.fromScale(0.94, 0.88); text.Position = UDim2.fromScale(0.03, 0.06)
+		if gui.Face == Enum.NormalId.Top then
+			-- Top-face canvas X follows part Z; rotate the line along the strip's X.
+			text.AnchorPoint = Vector2.new(0.5, 0.5)
+			text.Position = UDim2.fromScale(0.5, 0.5)
+			text.Size = UDim2.fromOffset(parent.Size.X * 80 * 0.94, parent.Size.Z * 80 * 0.8)
+			text.Rotation = 90
+		end
 		text.BackgroundTransparency = 1; text.Text = message; text.TextColor3 = color or theme.Text
 		text.Font = Enum.Font.GothamBold; text.TextScaled = true; text.Parent = gui
 	end
 	local base = floor.CFrame * CFrame.new(0, floor.Size.Y / 2, 0)
 	local halfX, halfZ = floor.Size.X / 2, floor.Size.Z / 2
+	-- Large removable surface layers make the room cohesive without repainting
+	-- imported MeshParts/SurfaceAppearance assets or changing the collision floor.
+	-- Set SurfaceFinishEnabled=false in VisualConfig to keep the original textures.
+	if config.SurfaceFinishEnabled ~= false then
+		part("FloorFinish", Vector3.new(floor.Size.X - 0.5, 0.02, floor.Size.Z - 0.5),
+			base * CFrame.new(0, 0.008, 0), Color3.fromRGB(69, 79, 91), Enum.Material.Concrete)
+		for _, side in ipairs({-1, 1}) do
+			part("LowerWallPanel", Vector3.new(0.06, 5.2, floor.Size.Z - 1),
+				base * CFrame.new(side * (halfX - 0.5), 2.8, 0), steel)
+			part("WallCapRail", Vector3.new(0.12, 0.12, floor.Size.Z - 1),
+				base * CFrame.new(side * (halfX - 0.45), 5.45, 0), theme.Accent)
+		end
+		part("LowerBackPanel", Vector3.new(floor.Size.X - 1, 5.2, 0.06),
+			base * CFrame.new(0, 2.8, halfZ - 0.5), steel)
+		part("BackCapRail", Vector3.new(floor.Size.X - 1, 0.12, 0.12),
+			base * CFrame.new(0, 5.45, halfZ - 0.45), theme.Accent)
+	end
 	-- A central route stays clear. Shelves sit at the rear sides, away from all stations.
 	if halfX >= 18 and halfZ >= 16 then
 		for _, side in ipairs({-1, 1}) do

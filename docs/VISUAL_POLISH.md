@@ -14,7 +14,10 @@ WarehouseVisuals is an independent server script. Each plot receives one
 WarehousePrototype/VisualPolish folder: two rear storage racks, twelve marked
 wooden crates, four ceiling housings/diffusers, two exterior diffusers, receiving
 boundaries/label, a numbered dock sign, an operations sign and two door lamps.
-The reference warehouse creates 45 new parts and six PointLights per plot.
+The reference warehouse creates 52 new parts and six PointLights per plot,
+including the follow-up removable charcoal floor/lower-wall finish. SurfaceGui
+labels use uniform pixels per stud; floor lettering rotates along the long strip
+instead of stretching a fixed canvas across it.
 All dressing is anchored, noncolliding, non-touching, non-queryable and has no
 shadows. SurfaceGui labels stop drawing past 90 studs. There are no decor physics
 loops, permanent particles or per-frame server updates. Plot destruction also
@@ -108,6 +111,9 @@ ReducedMotion skips new bursts, reduces reveal motion and makes button transitio
 instant. It isn't a complete accessibility overhaul of existing animations.
 AudioEnabled mutes the new sound hooks. Lower light range/brightness or remove
 fixtures in WarehouseVisuals if your maximum-player/mobile test needs it.
+The follow-up surface finish defaults on; add `SurfaceFinishEnabled = false` to
+VisualConfig if you prefer the original floor/lower-wall textures. The original
+meshes and collision remain underneath; the new layers disappear after Stop.
 
 SoundIds keys are Button, Cash, BoxOpen, RareReveal, Scanner, Upgrade and Door.
 Assign a numeric ID string (for example, the ID portion of an audio asset URL) to a

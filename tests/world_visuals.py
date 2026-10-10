@@ -37,8 +37,9 @@ local Vector2 = {new=function(x,y) return {X=x,Y=y} end}
 local frameMT = {__mul=function(a,b) return setmetatable(triple(a.X+b.X,a.Y+b.Y,a.Z+b.Z),getmetatable(a)) end}
 local CFrame = {new=function(x,y,z) return setmetatable(triple(x or 0,y or 0,z or 0),frameMT) end}
 local Color3 = {fromRGB=triple}
-local UDim2 = {fromScale=function(x,y) return {x,y} end}
-local Enum = {Material={Metal='Metal',Neon='Neon',Wood='Wood',SmoothPlastic='SmoothPlastic'},
+local UDim2 = {fromScale=function(x,y) return {x,y} end,fromOffset=function(x,y) return {x,y} end}
+local Enum = {Material={Metal='Metal',Neon='Neon',Wood='Wood',SmoothPlastic='SmoothPlastic',Concrete='Concrete'},
+ SurfaceGuiSizingMode={PixelsPerStud='PixelsPerStud'},
  NormalId={Front='Front',Top='Top'},Font={GothamBold='GothamBold'}}
 local all = {}
 local methods = {}
@@ -112,7 +113,15 @@ for _,object in ipairs(all) do
   end
  elseif object.ClassName=='PointLight' then lights+=1; assert(object.Shadows==false) end
 end
-assert(count==45 and lights==6,'Keep reference per-plot props and lights bounded')
+assert(count==52 and lights==6,'Keep reference per-plot props and lights bounded')
+local receiving=folder:FindFirstChild('ReceivingLabel')
+local receivingGui=receiving.children[1]
+assert(receivingGui.SizingMode=='PixelsPerStud' and receivingGui.PixelsPerStud==80)
+local lettering=receivingGui.children[1]
+assert(lettering.Rotation==90 and lettering.Size[1]>lettering.Size[2], 'Floor text must follow the long strip axis')
+local finish=folder:FindFirstChild('FloorFinish')
+assert(finish.Material=='Concrete' and finish.CanCollide==false, 'Finish must not replace collision geometry')
+assert(finish.CFrame.Y+finish.Size.Y/2 < receiving.CFrame.Y+receiving.Size.Y/2, 'Receiving markings must stay above the finish')
 for object,original in pairs(before) do
  assert(object.CFrame==original.frame and object.Size==original.size,'Imported meshes/markers must not move')
 end
