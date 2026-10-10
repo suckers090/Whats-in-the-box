@@ -69,6 +69,18 @@
           "Disabled": false,
           "RunContext": "Legacy"
         }
+      },
+      "YardLayout": {
+        "$path": "src/ServerScriptService/YardLayout.luau",
+        "$ignoreUnknownInstances": true
+      },
+      "WarehouseExterior": {
+        "$path": "src/ServerScriptService/WarehouseExterior.server.luau",
+        "$ignoreUnknownInstances": true,
+        "$properties": {
+          "Disabled": false,
+          "RunContext": "Legacy"
+        }
       }
     },
     "StarterPlayer": {

@@ -2,6 +2,10 @@
 
 Existing Roblox warehouse mystery-package game.
 
+The [industrial yard update](docs/INDUSTRIAL_YARD.md) adds shared streets, lot
+markings, landscaping and matching exterior finishes. It needs only two new
+server files plus the updated Rojo mapping; existing save settings stay intact.
+
 The [staged industrial visual polish](docs/VISUAL_POLISH.md) adds disposable world
 dressing, lighting, shared UI finishing and action/audio hooks. Its update list
 preserves local save settings and the imported warehouse.
