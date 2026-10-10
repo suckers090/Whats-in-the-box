@@ -65,7 +65,13 @@ stateEvent.OnServerEvent:Connect(function(player, action, id)
 		local character = player.Character
 		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 		if plot and character and humanoid and humanoid.Health > 0 then
-			local target = action == "GoScanner" and plot.Markers.ScannerLocation.CFrame * CFrame.new(5, 3, 3) or plot.Spawn.CFrame + Vector3.new(0, 4, 0)
+			local target = plot.Spawn.CFrame + Vector3.new(0, 4, 0)
+			if action == "GoScanner" then
+				local pad = plot.ScannerPurchasePad
+				if not pad or not pad:IsDescendantOf(plot.Model) then return end
+				-- Stand beside the pad at its actual height, even when the marker is resized.
+				target = pad.CFrame * CFrame.new(0, pad.Size.Y / 2 + 3, pad.Size.Z / 2 + 2)
+			end
 			character:PivotTo(target)
 		end
 	end

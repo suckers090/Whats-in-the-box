@@ -65,6 +65,8 @@ local function setupPlot(plot)
 	local purchasePrompt = addPrompt(
 		purchasePad, "Buy Scanner - $2000", "Warehouse Upgrade"
 	)
+	-- Navigation and purchase validation share the visible station, not its hidden marker.
+	plot.ScannerPurchasePad = purchasePad
 
 	local sign = Instance.new("BillboardGui")
 	sign.Size = UDim2.fromOffset(210, 55)
@@ -223,7 +225,17 @@ local function setupPlot(plot)
 	end
 
 	local function buyScanner(player)
-		if not Registry.CanInteract(plot, player, purchasePad, 10) then
+		if player:GetAttribute("DataReady") ~= true then
+			notify(player, "Saving is paused. Please wait before buying upgrades.")
+			return
+		end
+		if Registry.Get(player) ~= plot or plot.Owner ~= player then
+			notify(player, "You can only buy upgrades at your own warehouse.")
+			return
+		end
+		-- The prompt displays within 10 studs. Allow a small margin for movement
+		-- between the displayed prompt and the server receiving its trigger.
+		if not Registry.CanInteract(plot, player, purchasePad, purchasePrompt.MaxActivationDistance + 2) then
 			notify(player, "Visit your scanner station before purchasing.")
 			return
 		end
