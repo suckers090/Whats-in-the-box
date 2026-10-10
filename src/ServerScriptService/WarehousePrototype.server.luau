@@ -5,6 +5,7 @@ local RS = game:GetService("ReplicatedStorage")
 local HttpService = game:GetService("HttpService")
 local Registry = require(script.Parent:WaitForChild("PlotRegistry"))
 local items = require(RS:WaitForChild("ItemCatalog"))
+local itemRoller = require(script.Parent:WaitForChild("ItemRoller"))(items)
 local function remote(name)
 	local event = RS:FindFirstChild(name)
 	if not event then event = Instance.new("RemoteEvent"); event.Name = name; event.Parent = RS end
@@ -33,12 +34,7 @@ local function pushState(player)
 	})
 end
 local function randomItem()
-	local roll, total = rng:NextInteger(1, 100), 0
-	for _, item in ipairs(items) do
-		total += item.weight
-		if roll <= total then return item end
-	end
-	return items[1]
+	return itemRoller.Roll(rng)
 end
 boxEvent.OnServerEvent:Connect(function(player, decision, token)
 	local data = sessions[player]
@@ -96,7 +92,7 @@ stateEvent.OnServerEvent:Connect(function(player, action, id, payload)
 	if action == "RequestState" then
 		pushState(player)
 	elseif action == "ClaimCollection" then
-		local earned, reason = Collection.Claim(data, id)
+		local earned, reason = Collection.Claim(data, id, 1000000000000 - player.leaderstats.Cash.Value)
 		if earned == nil then notice:FireClient(player, reason); return end
 		player.leaderstats.Cash.Value += earned
 		pushState(player)

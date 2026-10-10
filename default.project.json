@@ -99,6 +99,10 @@
       "InventoryActions": {
         "$path": "src/ServerScriptService/InventoryActions.luau",
         "$ignoreUnknownInstances": true
+      },
+      "ItemRoller": {
+        "$path": "src/ServerScriptService/ItemRoller.luau",
+        "$ignoreUnknownInstances": true
       }
     },
     "StarterPlayer": {
@@ -182,6 +186,22 @@
       },
       "HUDNavigation": {
         "$path": "src/ReplicatedStorage/HUDNavigation.luau",
+        "$ignoreUnknownInstances": true
+      },
+      "CollectionView": {
+        "$path": "src/ReplicatedStorage/CollectionView.luau",
+        "$ignoreUnknownInstances": true
+      },
+      "ItemArt": {
+        "$path": "src/ReplicatedStorage/ItemArt.luau",
+        "$ignoreUnknownInstances": true
+      },
+      "ItemPreview": {
+        "$path": "src/ReplicatedStorage/ItemPreview.luau",
+        "$ignoreUnknownInstances": true
+      },
+      "MenuStyle": {
+        "$path": "src/ReplicatedStorage/MenuStyle.luau",
         "$ignoreUnknownInstances": true
       }
     },

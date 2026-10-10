@@ -3,7 +3,7 @@ local rules = require("../src/ServerScriptService/InventoryState")(catalog)
 local first, visitor = rules.New(), rules.New()
 local weight = 0
 for _, item in ipairs(catalog) do weight += item.weight end
-assert(weight == 100, "Existing RNG probabilities must sum to 100")
+assert(weight == 10000, "Expanded weights must match the tested catalog distribution")
 assert(rules.Resolve(first, "Sell") == nil, "No reward without an opened item")
 assert(rules.Discover(first, "gold_watch"))
 assert(not rules.Discover(first, "old_toy"), "Pending choice blocks another reward")

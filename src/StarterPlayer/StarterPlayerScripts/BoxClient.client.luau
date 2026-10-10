@@ -16,6 +16,11 @@ local style = require(RS:WaitForChild("UIStyle"))
 local presentation = require(RS:WaitForChild("Presentation"))
 local config = require(RS:WaitForChild("VisualConfig"))
 local revealStyle = require(RS:WaitForChild("RevealStyle"))
+local itemPreview = require(RS:WaitForChild("ItemPreview"))
+local catalog = require(RS:WaitForChild("ItemCatalog"))
+local previewItems = {}
+local original = {old_toy = true, headphones = true, gaming_console = true, gold_watch = true, mysterious_device = true}
+for _, item in ipairs(catalog) do previewItems[item.id] = item end
 local colors = theme.Rarity
 
 local gui = Instance.new("ScreenGui")
@@ -153,8 +158,14 @@ player:GetAttributeChangedSignal("DataReady"):Connect(function()
 end)
 
 -- Build simple 3D item models
-local function buildItem(name)
+local function buildItem(name, id)
 	world:ClearAllChildren()
+	local item = previewItems[id]
+	if item and not original[id] then
+		currentModel = itemPreview.Build(world, item, colors[item.rarity] or theme.Accent)
+		rotation = 0
+		return currentModel
+	end
 
 	local model = Instance.new("Model")
 	model.Name = "Prize"
@@ -300,7 +311,7 @@ event.OnClientEvent:Connect(function(action, data)
 		viewport.BackgroundColor3 =
 			theme.Panel
 
-		buildItem(data.name)
+		buildItem(data.name, data.id)
 
 		backdrop.Visible = true
 		presentation.Play("BoxOpen")

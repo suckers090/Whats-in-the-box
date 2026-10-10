@@ -1,7 +1,7 @@
 -- Pure display ordering. This module never grants/sells items or decides a price.
 local view = {Sorts = {"Rarity", "Value", "Name", "Count"},
-	Filters = {"All", "Favorites", "Unlocked", "Common", "Uncommon", "Rare", "Legendary"}}
-local ranks = {Common = 1, Uncommon = 2, Rare = 3, Legendary = 4, Secret = 5}
+	Filters = {"All", "Favorites", "Unlocked", "Common", "Uncommon", "Rare", "Epic", "Legendary"}}
+local ranks = {Common = 1, Uncommon = 2, Rare = 3, Epic = 4, Legendary = 5, Mythic = 6, Secret = 7}
 function view.List(catalog, inventory, locks, favorites, sort, filter)
 	local rows = {}
 	for _, item in ipairs(catalog) do

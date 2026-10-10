@@ -51,19 +51,19 @@ Instance.new=function(class,parent)
  return value
 end
 theme.Background=triple(13,19,29); theme.Panel=Color3.fromRGB(24,32,45); theme.Raised=triple(32,42,56)
-theme.Muted=triple(150,165,181); theme.Rarity={Common=theme.Text,Uncommon=theme.Success,Rare=theme.Accent,Legendary=triple(207,128,58)}
+theme.Muted=triple(150,165,181); theme.Rarity={Common=theme.Text,Uncommon=theme.Success,Rare=theme.Accent,Epic=triple(175,110,250),Legendary=triple(207,128,58)}
 local player=node('Player','Owner'); player:SetAttribute('DataReady',true)
 local playerGui=node('PlayerGui','PlayerGui',player)
 local event=node('RemoteEvent','WarehouseState',RS); local boxEvent=node('RemoteEvent','BoxEvent',RS)
 local noticeEvent=node('RemoteEvent','WarehouseNotice',RS)
 local obsolete=node('ScreenGui','WarehouseHUD',playerGui)
-for _,name in ipairs({'UITheme','UIStyle','Presentation','VisualConfig','ItemCatalog','CollectionMilestones','InventoryView','RevealStyle','HUDLayout','HUDNavigation'}) do node('ModuleScript',name,RS) end
+for _,name in ipairs({'UITheme','UIStyle','Presentation','VisualConfig','ItemCatalog','CollectionMilestones','InventoryView','RevealStyle','HUDLayout','HUDNavigation','CollectionView','MenuStyle','ItemArt','ItemPreview'}) do node('ModuleScript',name,RS) end
 local dependencies={UITheme=theme,
  UIStyle={Surface=function(value) return value:FindFirstChildOfClass('UIStroke') or node('UIStroke','UIStroke',value) end,Button=function() end},
  Presentation={Play=function() end,Burst=function() end},
  VisualConfig={EffectsEnabled=true,ReducedMotion=true},
  ItemCatalog=import('./ItemCatalog'),CollectionMilestones=import('./CollectionMilestones'),
- InventoryView=import('./InventoryView'),RevealStyle=import('./RevealStyle'),HUDLayout=import('./HUDLayout')}
+ InventoryView=import('./InventoryView'),RevealStyle=import('./RevealStyle'),HUDLayout=import('./HUDLayout'),CollectionView=import('./CollectionView')}
 local function require(value) return dependencies[value.Name] end
 local GuiService={SelectedObject=nil}
 local input=node('UserInputService','Input'); input.TouchEnabled=false; input.InputBegan=signal()
@@ -78,6 +78,8 @@ game.GetService=function(_,name)
 end
 '''
 prefix += '\nlocal function loadNavigation()\n' + (root / 'src/ReplicatedStorage/HUDNavigation.luau').read_text() + '\nend\ndependencies.HUDNavigation=loadNavigation()\n'
+for module in ('MenuStyle', 'ItemArt', 'ItemPreview'):
+    prefix += '\nlocal function loadModule()\n' + (root / 'src/ReplicatedStorage' / (module + '.luau')).read_text() + '\nend\ndependencies.' + module + '=loadModule()\n'
 prefix += '\nlocal function runHUD()\n' + (root / 'src/StarterPlayer/StarterPlayerScripts/WarehouseHUD.client.luau').read_text() + '\nend\nrunHUD()\nrunHUD()\n'
 for file in ('BoxClient.client.luau', 'WarehouseNotifications.client.luau'):
     prefix += '\ndo\n' + (root / 'src/StarterPlayer/StarterPlayerScripts' / file).read_text() + '\nend\n'
@@ -91,6 +93,7 @@ local function findText(parent,value,class)
  error('Missing text: '..value)
 end
 local function click(parent,value)
+ if value=='X' then parent:FindFirstChild('CloseMenu',true).Activated:Fire(); return end
  local nav=parent:FindFirstChild(value..'Nav',true)
  if nav then nav.Activated:Fire() else findText(parent,value,'TextButton').Activated:Fire() end
 end
@@ -168,6 +171,52 @@ end
 click(gui,'Shop'); click(gui,'OPEN INVENTORY')
 assert(inventoryNav:FindFirstChild('ActiveMark').Visible,'Internal menu links update the selected button')
 click(gui,'HOME'); assert(event.sent[#event.sent][1]=='GoHome','Home travel remains functional')
+local allFinds={}; for _,item in ipairs(dependencies.ItemCatalog) do allFinds[item.id]=1 end
+event.OnClientEvent:Fire({inventory={arcade_board=3,diamond_relic=1},discoveries=allFinds,
+ collectionClaims={first_find=true,getting_started=true,original_five=true}})
+click(gui,'Index')
+local menu=gui:FindFirstChild('MenuPanel',true)
+local function itemCount()
+ local count=0; for _,c in ipairs(descendants(menu)) do if string.sub(c.Name,1,5)=='Item_' then count+=1 end end; return count
+end
+assert(itemCount()==60,'Index renders the expanded catalog')
+local search=menu:FindFirstChild('IndexSearch',true)
+search.Text='tools'; search:GetPropertyChangedSignal('Text'):Fire(); assert(itemCount()==8,'Category search works in the real UI')
+search.Text='[.*]'; search:GetPropertyChangedSignal('Text'):Fire(); assert(itemCount()==0,'No pattern search injection')
+search.Text=''; search:GetPropertyChangedSignal('Text'):Fire()
+local mode=menu:FindFirstChild('IndexMode',true); mode.Activated:Fire()
+assert(itemCount()==0 and findText(menu,'Getting Organized'),'Rewards use a separate view')
+local beforeClaim=#event.sent
+player:SetAttribute('DataReady',false); click(menu,'CLAIM $1000'); assert(#event.sent==beforeClaim,'Paused Index claims must not send requests')
+player:SetAttribute('DataReady',true); click(menu,'CLAIM $1000')
+assert(event.sent[#event.sent][1]=='ClaimCollection' and event.sent[#event.sent][2]=='warehouse_ten')
+assert(not pcall(function() findText(menu,'CLAIM $100') end),'Previously claimed bonuses stay claimed')
+mode.Activated:Fire()
+local rarityFilter=menu:FindFirstChild('IndexFilter',true)
+for _=1,6 do rarityFilter.Activated:Fire() end
+assert(itemCount()==8 and string.find(rarityFilter.Text,'EPIC',1,true))
+rarityFilter.Activated:Fire(); rarityFilter.Activated:Fire(); assert(itemCount()==60)
+for _,device in ipairs({{1920,980},{768,900},{390,720},{320,500},{280,420},{844,300},{568,230}}) do
+ safe.AbsoluteSize={X=device[1],Y=device[2]}; safe:GetPropertyChangedSignal('AbsoluteSize'):Fire()
+ for _,tab in ipairs({'Inventory','Index','Shop','Scanner','Upgrades'}) do
+  click(gui,'X'); click(gui,tab)
+  local m=dependencies.MenuStyle(theme,dependencies.VisualConfig,dependencies.UIStyle).Measure(device[1],device[2],tab)
+  assert(menu.Size[2]<=device[1] and menu.Size[4]<=device[2] and m.listHeight>0)
+  local list=menu:FindFirstChildOfClass('ScrollingFrame')
+  assert(list.Position[4]>=m.header+m.reservedTools+m.status and list.Position[4]+list.Size[4]<=menu.Size[4]-m.footer,'Menu list leaves header/tools/footer clear')
+  if m.inline then assert(m.toolsX+m.toolsWidth<=m.width-72 and m.listHeight>=70,'Landscape toolbars leave room for close and a useful scrolling area') end
+ end
+end
+click(gui,'X')
+local previewWorld=playerGui:FindFirstChild('BoxRevealUI'):FindFirstChild('ItemPreview',true):FindFirstChildOfClass('WorldModel')
+for _,item in ipairs(dependencies.ItemCatalog) do
+ boxEvent.OnClientEvent:Fire('Reveal',{id=item.id,token='preview-'..item.id,name=item.name,rarity=item.rarity,value=item.value,isNew=true})
+ assert(#previewWorld:GetChildren()==1,'Exactly one prize model per reveal')
+ local parts=previewWorld:GetChildren()[1]:GetChildren(); assert(#parts>=3 and #parts<=8,'All previews have bounded geometry')
+ for _,p in ipairs(parts) do assert(p.Anchored and p.CanCollide==false and p.Size.X>0 and p.Size.Y>0 and p.Size.Z>0) end
+ boxEvent.OnClientEvent:Fire('Closed',{token='preview-'..item.id}); assert(#previewWorld:GetChildren()==0,'Preview geometry clears after reveal')
+end
+safe.AbsoluteSize={X=1280,Y=720}; safe:GetPropertyChangedSignal('AbsoluteSize'):Fire()
 local fixture={inventory={old_toy=5,gold_watch=2},discoveries={old_toy=5,gold_watch=2},
  collectionClaims={},inventoryLocks={},inventoryFavorites={},scanner=true,plot=1}
 event.OnClientEvent:Fire(fixture)
@@ -191,7 +240,7 @@ click(gui,'SORT / RARITY'); assert(findText(gui,'SORT / VALUE','TextButton'))
 click(gui,'SHOW / ALL'); assert(findText(gui,'SHOW / FAVORITES','TextButton'))
 assert(not pcall(function() findText(gui,'Gold Watch') end),'Favorites filter hides unmarked stacks')
 click(gui,'SHOW / FAVORITES'); click(gui,'SHOW / UNLOCKED'); click(gui,'SHOW / COMMON')
-click(gui,'SHOW / UNCOMMON'); click(gui,'SHOW / RARE'); click(gui,'SHOW / LEGENDARY')
+click(gui,'SHOW / UNCOMMON'); click(gui,'SHOW / RARE'); click(gui,'SHOW / EPIC'); click(gui,'SHOW / LEGENDARY')
 event.OnClientEvent:Fire({inventoryFavorites={}})
 local modal=gui:FindFirstChild('DuplicateSaleConfirmation',true)
 click(gui,'SELL DUPES'); request=event.sent[#event.sent]
@@ -243,10 +292,10 @@ boxEvent.OnClientEvent:Fire('Closed',{token='r2'})
 assert(not nav.Visible and toggle.Visible and toggle:GetAttribute('Collapsed'),'Closing reveal preserves collapsed preference')
 toggle.Activated:Fire(); assert(nav.Visible and inventoryNav.Active)
 runHUD(); assert(playerGui:FindFirstChild('WarehouseHUD')==gui,'Duplicate/respawn controller keeps current navigation state')
-print('PASS: bubble HUD menu/hover/tap/selected callbacks, eight device layouts, notice/toggle exclusion, rapid collapse/resize/reveal handling and original inventory safeguards')
+print('PASS: preserved bubble HUD, responsive menu bounds, 60-card searchable Index, rarity/rewards browsing and claim pause guard, all 60 bounded previews, and original inventory/reveal safeguards')
 '''
 with tempfile.TemporaryDirectory() as directory:
-    for name in ('ItemCatalog', 'CollectionMilestones', 'InventoryView', 'RevealStyle', 'HUDLayout'):
+    for name in ('ItemCatalog', 'CollectionMilestones', 'InventoryView', 'RevealStyle', 'HUDLayout', 'CollectionView'):
         shutil.copyfile(root / 'src/ReplicatedStorage' / (name + '.luau'), Path(directory) / (name + '.luau'))
     driver = Path(directory) / 'ui.luau'
     driver.write_text(prefix + checks)

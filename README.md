@@ -2,6 +2,10 @@
 
 Existing Roblox warehouse mystery-package game.
 
+The [menu and content update](docs/MENU_CONTENT.md) brings the five existing menus
+into the bubble HUD's style and expands discovery to 60 items across five rarities.
+Index browsing/rewards grow while original item IDs, v1 saves and the side HUD stay intact.
+
 The [bubble HUD refinement](docs/BUBBLE_HUD.md) adds rounder faces, subtle depth,
 compact cash spacing and a collapsible navigation arrow to the existing icon HUD.
 

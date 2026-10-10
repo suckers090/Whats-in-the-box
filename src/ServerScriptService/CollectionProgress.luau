@@ -10,12 +10,15 @@ return function(catalog, milestones)
 		end
 		return count
 	end
-	function rules.Claim(data, id)
+	function rules.Claim(data, id, availableCredit)
 		local milestone = type(id) == "string" and byId[id]
 		if not milestone then return nil, "Unknown collection reward." end
 		if data.collectionClaims[id] then return nil, "Collection reward already claimed." end
 		if rules.Count(data.discoveries) < milestone.required then
 			return nil, "Discover more different items to unlock this reward."
+		end
+		if availableCredit and milestone.reward > availableCredit then
+			return nil, "Cash limit reached; collection reward remains unclaimed."
 		end
 		-- No yield: record the claim before the caller adds cash in the same handler.
 		data.collectionClaims[id] = true

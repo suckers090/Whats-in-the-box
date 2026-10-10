@@ -17,7 +17,7 @@ local import=require
 local modules={
  InventoryState=import('./InventoryState'), InventoryActions=import('./InventoryActions'),
  ItemCatalog=import('./ItemCatalog'), CollectionProgress=import('./CollectionProgress'),
- CollectionMilestones=import('./CollectionMilestones'), PlayerProfiles={}
+ CollectionMilestones=import('./CollectionMilestones'), ItemRoller=import('./ItemRoller'), PlayerProfiles={}
 }
 local now,serial=0,0
 local os={clock=function() return now end}
@@ -109,6 +109,7 @@ print('PASS: actual remote handlers, per-player receipts, authoritative prices/c
 '''.replace('SNAPSHOT', snapshot)
 with tempfile.TemporaryDirectory() as directory:
     for name, folder in [('InventoryState', 'ServerScriptService'), ('InventoryActions', 'ServerScriptService'),
+                         ('ItemRoller', 'ServerScriptService'),
                          ('CollectionProgress', 'ServerScriptService'), ('ItemCatalog', 'ReplicatedStorage'),
                          ('CollectionMilestones', 'ReplicatedStorage')]:
         shutil.copyfile(root / 'src' / folder / (name + '.luau'), Path(directory) / (name + '.luau'))
