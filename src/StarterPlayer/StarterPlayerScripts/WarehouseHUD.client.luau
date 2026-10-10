@@ -5,10 +5,20 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local GuiService = game:GetService("GuiService")
 local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+-- Claim synchronously before any dependency waits: a second HUD script cannot
+-- attach duplicate remote listeners or create a second controller on respawn.
+if playerGui:GetAttribute("WITB_HUDController") then return end
+playerGui:SetAttribute("WITB_HUDController", true)
+for _, child in ipairs(playerGui:GetChildren()) do
+	if child.Name == "WarehouseHUD" and child:IsA("ScreenGui") then child:Destroy() end
+end
 local theme = require(RS:WaitForChild("UITheme"))
 local style = require(RS:WaitForChild("UIStyle"))
 local presentation = require(RS:WaitForChild("Presentation"))
 local visualConfig = require(RS:WaitForChild("VisualConfig"))
+local layout = require(RS:WaitForChild("HUDLayout"))
+local navigation = require(RS:WaitForChild("HUDNavigation"))(theme, visualConfig, style, presentation)
 local catalog = require(RS:WaitForChild("ItemCatalog"))
 local milestones = require(RS:WaitForChild("CollectionMilestones"))
 local inventoryView = require(RS:WaitForChild("InventoryView"))
@@ -16,10 +26,15 @@ local event = RS:WaitForChild("WarehouseState")
 local boxEvent = RS:WaitForChild("BoxEvent")
 local state = {inventory = {}, discoveries = {}, collectionClaims = {}, inventoryLocks = {}, inventoryFavorites = {}, plot = 0, scanner = false}
 local currentTab, revealActive, previousSelection = nil, false, nil
+local revealToken
 local sortIndex, filterIndex, sequence = 1, 1, 0
 local pendingRequest, saleQuote = nil, nil
 local inventoryMessage = "Locks protect every sale. Favorites are excluded from duplicate sales."
 local render
+local navButtons = {}
+local function selectNavigation()
+	for id, handle in pairs(navButtons) do handle.Select(id == currentTab) end
+end
 local function create(class, properties, parent)
 	local value = Instance.new(class)
 	for key, property in pairs(properties) do value[key] = property end
@@ -44,17 +59,30 @@ local function button(parent, title, position, size, callback)
 	return value
 end
 local gui = create("ScreenGui", {Name = "WarehouseHUD", ResetOnSpawn = false, DisplayOrder = 5,
-	ZIndexBehavior = Enum.ZIndexBehavior.Sibling}, player:WaitForChild("PlayerGui"))
-local hud = create("Frame", {Size = UDim2.fromOffset(205, 88), Position = UDim2.fromOffset(14, 12),
-	BackgroundColor3 = theme.Background, BackgroundTransparency = 0.08, BorderSizePixel = 0}, gui)
-surface(hud)
-local cashLabel = text(hud, "$0", 22, UDim2.fromOffset(14, 8), UDim2.new(1, -28, 0, 28))
-local plotLabel = text(hud, "WAREHOUSE / ASSIGNING", 10, UDim2.fromOffset(14, 39), UDim2.new(1, -28, 0, 20), theme.Muted)
+	ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets, ClipToDeviceSafeArea = true,
+	ZIndexBehavior = Enum.ZIndexBehavior.Sibling}, playerGui)
+local safeRoot = create("Frame", {Name = "SafeArea", Size = UDim2.fromScale(1, 1),
+	BackgroundTransparency = 1}, gui)
+local hud = create("Frame", {Name = "CashCard", Size = UDim2.fromOffset(230, 96), Position = UDim2.fromOffset(14, 8),
+	BackgroundColor3 = theme.Background, BackgroundTransparency = 0.04, BorderSizePixel = 0}, safeRoot)
+style.Surface(hud, 18)
+local cashBadge = create("Frame", {Name = "CashBadge", Position = UDim2.fromOffset(12, 25), Size = UDim2.fromOffset(32, 32),
+	BackgroundColor3 = theme.Success, BackgroundTransparency = 0.88, BorderSizePixel = 0}, hud)
+create("UICorner", {CornerRadius = UDim.new(0, 10)}, cashBadge)
+navigation.Icon(cashBadge, "Cash", theme.Success)
+local cashHeading = text(hud, "WAREHOUSE FUNDS", 9, UDim2.fromOffset(14, 9), UDim2.fromOffset(120, 12), theme.Muted)
+local cashLabel = text(hud, "$0", 26, UDim2.fromOffset(52, 25), UDim2.new(1, -64, 0, 32))
+cashLabel.TextScaled = true
+create("UITextSizeConstraint", {MinTextSize = 13, MaxTextSize = 26}, cashLabel)
+local plotLabel = text(hud, "WAREHOUSE / ASSIGNING", 10, UDim2.fromOffset(14, 57), UDim2.new(1, -28, 0, 14), theme.Muted)
 cashLabel.TextColor3 = theme.Success
-local cashGain = text(gui, "", 13, UDim2.fromOffset(222, 18), UDim2.fromOffset(86, 26), theme.Success)
+local cashGain = text(hud, "", 10, UDim2.new(1, -96, 0, 7), UDim2.fromOffset(82, 14), theme.Success)
+cashGain.TextXAlignment = Enum.TextXAlignment.Right
+cashGain.TextScaled = true
+create("UITextSizeConstraint", {MinTextSize = 8, MaxTextSize = 10}, cashGain)
 cashGain.Visible = false
 local cashTween, cashFlash, cashGeneration = nil, nil, 0
-local deliveryLabel = text(hud, "DELIVERY / PREPARING", 10, UDim2.fromOffset(14, 61), UDim2.new(1, -28, 0, 18), theme.Accent)
+local deliveryLabel = text(hud, "DELIVERY / PREPARING", 10, UDim2.fromOffset(14, 75), UDim2.new(1, -28, 0, 14), theme.Accent)
 local function updateDeliveryStatus()
 	local phase = player:GetAttribute("DeliveryPhase")
 	local count = player:GetAttribute("PackageCount") or 0
@@ -72,17 +100,38 @@ for _, attribute in ipairs({"DeliveryPhase", "PackageCount", "NextDeliveryAt"}) 
 end
 updateDeliveryStatus()
 task.spawn(function() while gui.Parent do task.wait(1); updateDeliveryStatus() end end)
-local dock = create("Frame", {AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -14),
-	Size = UDim2.new(0.94, 0, 0, 48), BackgroundColor3 = theme.Background, BorderSizePixel = 0}, gui)
-surface(dock)
-if UserInputService.TouchEnabled then
-	dock.AnchorPoint = Vector2.new(0.5, 0)
-	dock.Position = UDim2.new(0.5, 0, 0, 108)
+local dock = create("ScrollingFrame", {Name = "IconNavigation", Position = UDim2.fromOffset(14, 116),
+	Size = UDim2.fromOffset(78, 388), BackgroundTransparency = 1, BorderSizePixel = 0,
+	CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y,
+	ScrollingDirection = Enum.ScrollingDirection.Y, ScrollBarThickness = 2,
+	ScrollBarImageColor3 = theme.Accent, VerticalScrollBarInset = Enum.ScrollBarInset.None}, safeRoot)
+create("UIPadding", {PaddingLeft = UDim.new(0, 3), PaddingTop = UDim.new(0, 3), PaddingBottom = UDim.new(0, 3)}, dock)
+local navList = create("UIListLayout", {FillDirection = Enum.FillDirection.Vertical,
+	Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder}, dock)
+local scrollHint = text(safeRoot, "SWIPE", 9, UDim2.fromOffset(14, 504), UDim2.fromOffset(78, 12), theme.Muted)
+scrollHint.TextXAlignment = Enum.TextXAlignment.Center; scrollHint.Visible = false
+local function resizeNavigation()
+	if safeRoot.AbsoluteSize.X <= 0 or safeRoot.AbsoluteSize.Y <= 0 then return end
+	local m = layout.Measure(safeRoot.AbsoluteSize.X, safeRoot.AbsoluteSize.Y, UserInputService.TouchEnabled)
+	hud.Position = UDim2.fromOffset(m.x, m.y); hud.Size = UDim2.fromOffset(m.cashWidth, m.cashHeight)
+	dock.Position = UDim2.fromOffset(m.x, m.navY); dock.Size = UDim2.fromOffset(m.navWidth, m.navHeight)
+	navList.Padding = UDim.new(0, m.gap)
+	cashHeading.Position = UDim2.fromOffset(14, m.compact and 4 or 9)
+	cashLabel.Position = UDim2.fromOffset(52, m.compact and 17 or 25)
+	cashLabel.Size = UDim2.new(1, -64, 0, m.compact and 26 or 32)
+	cashBadge.Position = UDim2.fromOffset(12, m.compact and 16 or 25)
+	cashBadge.Size = UDim2.fromOffset(m.compact and 26 or 32, m.compact and 26 or 32)
+	plotLabel.Position = UDim2.fromOffset(14, m.compact and 44 or 57)
+	deliveryLabel.Position = UDim2.fromOffset(14, m.compact and 58 or 75)
+	plotLabel.Visible = not m.tiny; deliveryLabel.Visible = not m.tiny
+	for _, handle in pairs(navButtons) do handle.Resize(m.row, m.compact) end
+	scrollHint.Visible = m.scroll
+	scrollHint.Text = UserInputService.TouchEnabled and "SWIPE" or "SCROLL"
+	scrollHint.Position = UDim2.fromOffset(m.x, m.navY + m.navHeight + 2)
+	scrollHint.Size = UDim2.fromOffset(m.navWidth, 12)
 end
-create("UISizeConstraint", {MaxSize = Vector2.new(610, 48)}, dock)
-create("UIPadding", {PaddingLeft = UDim.new(0, 5), PaddingRight = UDim.new(0, 5)}, dock)
-create("UIListLayout", {FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 4),
-	VerticalAlignment = Enum.VerticalAlignment.Center}, dock)
+safeRoot:GetPropertyChangedSignal("AbsoluteSize"):Connect(resizeNavigation)
+UserInputService:GetPropertyChangedSignal("TouchEnabled"):Connect(resizeNavigation)
 local shade = create("Frame", {Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(),
 	BackgroundTransparency = 0.3, Visible = false, Active = true}, gui)
 local panel = create("Frame", {AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.48),
@@ -104,6 +153,7 @@ local function close()
 	if confirmLayer then confirmLayer.Visible = false end
 	saleQuote = nil
 	currentTab = nil
+	selectNavigation()
 	GuiService.SelectedObject = previousSelection
 end
 closeButton = button(panel, "X", UDim2.new(1, -54, 0, 12), UDim2.fromOffset(38, 38), close)
@@ -182,6 +232,11 @@ local confirmSale = button(confirmPanel, "CONFIRM SALE", UDim2.new(0.48, 4, 1, -
 end)
 cancelSale.ZIndex = 13; confirmSale.ZIndex = 13
 local saveLabel = text(panel, "PROGRESS / LOADING", 10, UDim2.new(0, 18, 1, -36), UDim2.new(1, -36, 0, 24), theme.Muted)
+saveLabel.Size = UDim2.new(1, -148, 0, 24)
+-- Preserve warehouse travel while keeping the five-button gameplay navigation focused.
+button(panel, "HOME", UDim2.new(1, -112, 1, -40), UDim2.fromOffset(94, 30), function()
+	close(); event:FireServer("GoHome")
+end)
 local function updateSaveStatus()
 	local status = player:GetAttribute("SaveStatus") or "Loading"
 	saveLabel.Text = status == "Studio preview" and "STUDIO PREVIEW / SAVING OFF" or ("PROGRESS / " .. string.upper(status))
@@ -210,6 +265,7 @@ local function station()
 	event:FireServer("GoScanner")
 end
 render = function()
+	selectNavigation()
 	for _, child in ipairs(list:GetChildren()) do if child:IsA("GuiObject") then child:Destroy() end end
 	local found, owned = 0, 0
 	for _, item in ipairs(catalog) do
@@ -323,18 +379,16 @@ local function open(tab)
 	currentTab = tab
 	render()
 	shade.Visible = true
-	scale.Scale = 0.96
-	TweenService:Create(scale, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {Scale = 1}):Play()
+	scale.Scale = visualConfig.ReducedMotion and 1 or 0.96
+	TweenService:Create(scale, TweenInfo.new(visualConfig.ReducedMotion and 0 or 0.18, Enum.EasingStyle.Quad), {Scale = 1}):Play()
 	GuiService.SelectedObject = closeButton
 end
-for _, name in ipairs({"Index", "Inventory", "Scanner", "Shop", "Upgrades", "Home"}) do
-	local b = button(dock, name, UDim2.new(), UDim2.new(1 / 6, -5, 0, 38), function()
-		if name == "Home" then close(); event:FireServer("GoHome") else open(name) end
-	end)
-	b.TextSize = 11
-	b.TextScaled = true
-	create("UITextSizeConstraint", {MinTextSize = 8, MaxTextSize = 11}, b)
+for order, item in ipairs(navigation.Items) do
+	local handle = navigation.Button(dock, item, function() open(item.id) end)
+	handle.Button.LayoutOrder = order
+	navButtons[item.id] = handle
 end
+resizeNavigation()
 UserInputService.InputBegan:Connect(function(input, processed)
 	if processed then return end
 	if input.KeyCode == Enum.KeyCode.I then open("Index")
@@ -382,12 +436,16 @@ player:GetAttributeChangedSignal("DataReady"):Connect(function()
 	else inventoryMessage = "Locks protect every sale. Favorites are excluded from duplicate sales." end
 	render()
 end)
-boxEvent.OnClientEvent:Connect(function(action)
+boxEvent.OnClientEvent:Connect(function(action, data)
 	if action == "Reveal" then
 		revealActive = true
+		revealToken = data and data.token
 		confirmLayer.Visible = false; saleQuote = nil
 		if shade.Visible then shade.Visible = false; currentTab = nil end
-	elseif action == "Closed" then revealActive = false end
+		selectNavigation(); dock.Visible = false; scrollHint.Visible = false
+	elseif action == "Closed" and (not data or data.token == revealToken) then
+		revealActive = false; revealToken = nil; dock.Visible = true; resizeNavigation()
+	end
 end)
 local function money(value)
 	local result = tostring(value)
@@ -414,13 +472,13 @@ task.spawn(function()
 		if cashTween then cashTween:Cancel() end
 		if cashFlash then cashFlash:Cancel() end
 		cashGain.Text = "+" .. money(earned)
-		cashGain.Position = UDim2.fromOffset(222, 18)
+		cashGain.Position = UDim2.new(1, -96, 0, 7)
 		cashGain.TextTransparency = 0; cashGain.Visible = true
 		cashLabel.TextColor3 = theme.Success:Lerp(theme.Text, 0.45)
 		cashFlash = TweenService:Create(cashLabel, TweenInfo.new(0.4), {TextColor3 = theme.Success})
 		cashFlash:Play()
 		cashTween = TweenService:Create(cashGain, TweenInfo.new(1.2), {TextTransparency = 1,
-			Position = UDim2.fromOffset(222, visualConfig.ReducedMotion and 18 or 8)})
+			Position = UDim2.new(1, -96, 0, visualConfig.ReducedMotion and 7 or 2)})
 		cashTween:Play()
 		task.delay(1.2, function() if generation == cashGeneration then cashGain.Visible = false end end)
 	end)

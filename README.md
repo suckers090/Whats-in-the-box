@@ -2,6 +2,10 @@
 
 Existing Roblox warehouse mystery-package game.
 
+The [industrial icon HUD](docs/ICON_HUD.md) replaces the bottom navigation with a
+responsive left-side icon stack and polished cash card. Existing menus, inventory
+safeguards and Home travel remain connected; server gameplay and saves are unchanged.
+
 The [inventory control milestone](docs/INVENTORY_CONTROL.md) adds saved locks and
 favorites, sorting/filtering, confirmed duplicate sales and receipt-aware package
 choices. See the refreshed [mechanics audit and roadmap](docs/GAMEPLAY_ROADMAP.md).

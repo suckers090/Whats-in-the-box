@@ -175,6 +175,14 @@
       "InventoryView": {
         "$path": "src/ReplicatedStorage/InventoryView.luau",
         "$ignoreUnknownInstances": true
+      },
+      "HUDLayout": {
+        "$path": "src/ReplicatedStorage/HUDLayout.luau",
+        "$ignoreUnknownInstances": true
+      },
+      "HUDNavigation": {
+        "$path": "src/ReplicatedStorage/HUDNavigation.luau",
+        "$ignoreUnknownInstances": true
       }
     },
     "ServerStorage": {
