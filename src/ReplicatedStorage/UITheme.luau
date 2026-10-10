@@ -4,5 +4,7 @@ return {
 	Accent = Color3.fromRGB(105, 167, 205), Text = Color3.fromRGB(235, 241, 249),
 	Muted = Color3.fromRGB(151, 169, 190), Success = Color3.fromRGB(79, 201, 147),
 	Rarity = {Common = Color3.fromRGB(177, 193, 210), Uncommon = Color3.fromRGB(83, 216, 148),
-		Rare = Color3.fromRGB(84, 164, 255), Legendary = Color3.fromRGB(255, 195, 74)},
+		Rare = Color3.fromRGB(84, 164, 255), Epic = Color3.fromRGB(184, 113, 250),
+		Legendary = Color3.fromRGB(255, 195, 74), Mythic = Color3.fromRGB(255, 110, 147),
+		Secret = Color3.fromRGB(114, 247, 234)},
 }

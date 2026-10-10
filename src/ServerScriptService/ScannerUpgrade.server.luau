@@ -26,8 +26,8 @@ local function setupPlot(plot)
 	local SEALED_PRICE = 120
 	local scannerUnlocked = plot.ScannerUnlocked
 
-	local function notify(player, message)
-		noticeEvent:FireClient(player, message)
+	local function notify(player, message, cue)
+		noticeEvent:FireClient(player, message, cue)
 	end
 
 	local function part(name, size, position, color, parent)
@@ -198,7 +198,7 @@ local function setupPlot(plot)
 				return
 			end
 
-			notify(player, getClue(value))
+			notify(player, getClue(value), "Scanner")
 		end)
 
 	end
@@ -261,7 +261,7 @@ local function setupPlot(plot)
 
 		showUnlockedScanner()
 
-		notify(player, "Package Scanner unlocked!")
+		notify(player, "Package Scanner unlocked!", "Upgrade")
 		print(player.Name .. " unlocked the Package Scanner!")
 	end
 	plot.PurchaseScanner = buyScanner

@@ -222,6 +222,7 @@ local function runPlot(plot)
 			prompt.Enabled = false
 
 			local item = prize
+			local isNew = (sessions[player].discoveries[item.id] or 0) == 0
 			Inventory.Discover(sessions[player], item.id)
 			pushState(player)
 
@@ -246,7 +247,8 @@ local function runPlot(plot)
 				boxEvent:FireClient(player, "Reveal", {
 					name = item.name,
 					value = item.value,
-					rarity = item.rarity
+					rarity = item.rarity,
+					isNew = isNew,
 				})
 			end
 

@@ -2,6 +2,10 @@
 
 Existing Roblox warehouse mystery-package game.
 
+The [staged industrial visual polish](docs/VISUAL_POLISH.md) adds disposable world
+dressing, lighting, shared UI finishing and action/audio hooks. Its update list
+preserves local save settings and the imported warehouse.
+
 See the [current gameplay audit and roadmap](docs/GAMEPLAY_ROADMAP.md). The next
 stage adds [one-time collection milestones](docs/COLLECTION_MILESTONES.md) to the
 existing Index, preserving v1 saves and the working warehouse gameplay.

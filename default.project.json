@@ -100,6 +100,14 @@
             "Disabled": false,
             "RunContext": "Legacy"
           }
+        },
+        "DoorAudio": {
+          "$path": "src/StarterPlayer/StarterPlayerScripts/DoorAudio.client.luau",
+          "$ignoreUnknownInstances": true,
+          "$properties": {
+            "Disabled": false,
+            "RunContext": "Legacy"
+          }
         }
       }
     },
@@ -128,6 +136,10 @@
       },
       "Presentation": {
         "$path": "src/ReplicatedStorage/Presentation.luau",
+        "$ignoreUnknownInstances": true
+      },
+      "RevealStyle": {
+        "$path": "src/ReplicatedStorage/RevealStyle.luau",
         "$ignoreUnknownInstances": true
       }
     }

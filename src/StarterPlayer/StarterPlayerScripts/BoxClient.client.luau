@@ -13,6 +13,9 @@ local event = RS:WaitForChild("BoxEvent")
 
 local theme = require(RS:WaitForChild("UITheme"))
 local style = require(RS:WaitForChild("UIStyle"))
+local presentation = require(RS:WaitForChild("Presentation"))
+local config = require(RS:WaitForChild("VisualConfig"))
+local revealStyle = require(RS:WaitForChild("RevealStyle"))
 local colors = theme.Rarity
 
 local gui = Instance.new("ScreenGui")
@@ -62,7 +65,7 @@ local function label(name, text, y, height)
 	return t
 end
 
-label("Title", "PACKAGE OPENED!", 0.03, 0.09)
+local titleLabel = label("Title", "PACKAGE OPENED!", 0.03, 0.09)
 local rarityLabel = label("Rarity", "", 0.13, 0.09)
 local revealStroke = frame:FindFirstChildOfClass("UIStroke")
 revealStroke.Thickness = 2
@@ -256,6 +259,9 @@ event.OnClientEvent:Connect(function(action, data)
 
 		local color = colors[data.rarity]
 			or Color3.new(1, 1, 1)
+		local effect = revealStyle(data.rarity, data.isNew)
+		titleLabel.Text = effect.title
+		titleLabel.TextColor3 = data.isNew and theme.Success or theme.Text
 
 		revealStroke.Color = color
 		revealStroke.Transparency = 0.05
@@ -271,11 +277,14 @@ event.OnClientEvent:Connect(function(action, data)
 		buildItem(data.name)
 
 		backdrop.Visible = true
+		presentation.Play("BoxOpen")
+		if effect.strong then presentation.Play("RareReveal") end
+		if effect.strong or data.isNew then presentation.Burst(frame, color, effect.strong) end
 
-		scale.Scale = 0.8
+		scale.Scale = config.ReducedMotion and 1 or (effect.special and 0.88 or 0.94)
 		TweenService:Create(
 			scale,
-			TweenInfo.new(data.rarity == "Legendary" and 0.6 or 0.3, Enum.EasingStyle.Back),
+			TweenInfo.new(config.ReducedMotion and 0 or effect.duration, Enum.EasingStyle.Back),
 			{Scale = 1}
 		):Play()
 

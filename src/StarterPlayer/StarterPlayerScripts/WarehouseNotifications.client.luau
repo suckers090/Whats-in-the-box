@@ -6,6 +6,7 @@ local RS = game:GetService("ReplicatedStorage")
 
 local theme = require(RS:WaitForChild("UITheme"))
 local style = require(RS:WaitForChild("UIStyle"))
+local presentation = require(RS:WaitForChild("Presentation"))
 local TweenService = game:GetService("TweenService")
 local player = Players.LocalPlayer
 local event = RS:WaitForChild("WarehouseNotice")
@@ -37,7 +38,8 @@ border.Transparency = 0.4
 border.Parent = message
 local notificationId = 0
 
-event.OnClientEvent:Connect(function(text)
+event.OnClientEvent:Connect(function(text, cue)
+	if cue then presentation.Play(cue) end
 	notificationId += 1
 	local thisId = notificationId
 

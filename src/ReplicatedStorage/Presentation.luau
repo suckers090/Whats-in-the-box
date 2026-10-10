@@ -24,11 +24,6 @@ function module.Play(cue, parent)
 	Debris:AddItem(sound, 8)
 	sound:Play()
 end
-function module.Pulse(label, color)
-	if not config.EffectsEnabled or config.ReducedMotion then return end
-	label.TextColor3 = color
-	TweenService:Create(label, TweenInfo.new(0.45), {TextColor3 = Color3.fromRGB(235, 241, 249)}):Play()
-end
 function module.Burst(parent, color, strong)
 	if not config.EffectsEnabled or config.ReducedMotion then return end
 	-- Bounded GUI particles: no assets, perpetual emitters, or world particle replication.

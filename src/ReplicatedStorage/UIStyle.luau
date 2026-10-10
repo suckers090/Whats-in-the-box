@@ -8,6 +8,7 @@ function style.Surface(frame, radius)
 	local corner = frame:FindFirstChildOfClass("UICorner") or Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(0, radius or 12); corner.Parent = frame
 	local stroke = frame:FindFirstChildOfClass("UIStroke") or Instance.new("UIStroke")
+	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 	stroke.Color = theme.Border; stroke.Thickness = 1; stroke.Transparency = 0.35; stroke.Parent = frame
 	if not frame:FindFirstChild("IndustrialGradient") then
 		local gradient = Instance.new("UIGradient")

@@ -7,6 +7,8 @@ local GuiService = game:GetService("GuiService")
 local player = Players.LocalPlayer
 local theme = require(RS:WaitForChild("UITheme"))
 local style = require(RS:WaitForChild("UIStyle"))
+local presentation = require(RS:WaitForChild("Presentation"))
+local visualConfig = require(RS:WaitForChild("VisualConfig"))
 local catalog = require(RS:WaitForChild("ItemCatalog"))
 local milestones = require(RS:WaitForChild("CollectionMilestones"))
 local event = RS:WaitForChild("WarehouseState")
@@ -44,6 +46,9 @@ surface(hud)
 local cashLabel = text(hud, "$0", 22, UDim2.fromOffset(14, 8), UDim2.new(1, -28, 0, 28))
 local plotLabel = text(hud, "WAREHOUSE / ASSIGNING", 10, UDim2.fromOffset(14, 39), UDim2.new(1, -28, 0, 20), theme.Muted)
 cashLabel.TextColor3 = theme.Success
+local cashGain = text(gui, "", 13, UDim2.fromOffset(222, 18), UDim2.fromOffset(86, 26), theme.Success)
+cashGain.Visible = false
+local cashTween, cashFlash, cashGeneration = nil, nil, 0
 local deliveryLabel = text(hud, "DELIVERY / PREPARING", 10, UDim2.fromOffset(14, 61), UDim2.new(1, -28, 0, 18), theme.Accent)
 local function updateDeliveryStatus()
 	local phase = player:GetAttribute("DeliveryPhase")
@@ -255,7 +260,29 @@ end
 task.spawn(function()
 	local cash = player:WaitForChild("leaderstats"):WaitForChild("Cash")
 	cashLabel.Text = money(cash.Value)
-	cash.Changed:Connect(function(value) cashLabel.Text = money(value) end)
+	local previous = cash.Value
+	cash.Changed:Connect(function(value)
+		local earned = value - previous
+		previous = value
+		cashLabel.Text = money(value)
+		if earned <= 0 then return end
+		presentation.Play("Cash")
+		if not visualConfig.EffectsEnabled then return end
+		cashGeneration += 1
+		local generation = cashGeneration
+		if cashTween then cashTween:Cancel() end
+		if cashFlash then cashFlash:Cancel() end
+		cashGain.Text = "+" .. money(earned)
+		cashGain.Position = UDim2.fromOffset(222, 18)
+		cashGain.TextTransparency = 0; cashGain.Visible = true
+		cashLabel.TextColor3 = theme.Success:Lerp(theme.Text, 0.45)
+		cashFlash = TweenService:Create(cashLabel, TweenInfo.new(0.4), {TextColor3 = theme.Success})
+		cashFlash:Play()
+		cashTween = TweenService:Create(cashGain, TweenInfo.new(1.2), {TextTransparency = 1,
+			Position = UDim2.fromOffset(222, visualConfig.ReducedMotion and 18 or 8)})
+		cashTween:Play()
+		task.delay(1.2, function() if generation == cashGeneration then cashGain.Visible = false end end)
+	end)
 end)
 event:FireServer("RequestState")
 

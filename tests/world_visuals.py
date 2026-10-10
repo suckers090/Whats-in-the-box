@@ -112,7 +112,7 @@ for _,object in ipairs(all) do
   end
  elseif object.ClassName=='PointLight' then lights+=1; assert(object.Shadows==false) end
 end
-assert(count<70 and lights==6,'Keep per-plot props and lights bounded')
+assert(count==45 and lights==6,'Keep reference per-plot props and lights bounded')
 for object,original in pairs(before) do
  assert(object.CFrame==original.frame and object.Size==original.size,'Imported meshes/markers must not move')
 end
