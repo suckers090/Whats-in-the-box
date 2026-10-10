@@ -12,6 +12,7 @@ local player = Players.LocalPlayer
 local event = RS:WaitForChild("BoxEvent")
 
 local theme = require(RS:WaitForChild("UITheme"))
+local style = require(RS:WaitForChild("UIStyle"))
 local colors = theme.Rarity
 
 local gui = Instance.new("ScreenGui")
@@ -36,6 +37,7 @@ frame.BackgroundColor3 = theme.Background
 frame.Parent = backdrop
 
 Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 16)
+style.Surface(frame, 16)
 
 local constraint = Instance.new("UISizeConstraint")
 constraint.MinSize = Vector2.new(250, 300)
@@ -62,7 +64,7 @@ end
 
 label("Title", "PACKAGE OPENED!", 0.03, 0.09)
 local rarityLabel = label("Rarity", "", 0.13, 0.09)
-local revealStroke = Instance.new("UIStroke")
+local revealStroke = frame:FindFirstChildOfClass("UIStroke")
 revealStroke.Thickness = 2
 revealStroke.Transparency = 0.35
 revealStroke.Parent = frame
@@ -108,6 +110,7 @@ local function button(name, title, x, color)
 	b.Selectable = true
 	b.Parent = frame
 	Instance.new("UICorner", b).CornerRadius = UDim.new(0, 10)
+	style.Button(b)
 	return b
 end
 

@@ -121,6 +121,14 @@
       "VisualConfig": {
         "$path": "src/ReplicatedStorage/VisualConfig.luau",
         "$ignoreUnknownInstances": true
+      },
+      "UIStyle": {
+        "$path": "src/ReplicatedStorage/UIStyle.luau",
+        "$ignoreUnknownInstances": true
+      },
+      "Presentation": {
+        "$path": "src/ReplicatedStorage/Presentation.luau",
+        "$ignoreUnknownInstances": true
       }
     }
   }

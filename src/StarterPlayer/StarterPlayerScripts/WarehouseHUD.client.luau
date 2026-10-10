@@ -6,6 +6,7 @@ local UserInputService = game:GetService("UserInputService")
 local GuiService = game:GetService("GuiService")
 local player = Players.LocalPlayer
 local theme = require(RS:WaitForChild("UITheme"))
+local style = require(RS:WaitForChild("UIStyle"))
 local catalog = require(RS:WaitForChild("ItemCatalog"))
 local milestones = require(RS:WaitForChild("CollectionMilestones"))
 local event = RS:WaitForChild("WarehouseState")
@@ -19,8 +20,7 @@ local function create(class, properties, parent)
 	return value
 end
 local function surface(frame)
-	create("UICorner", {CornerRadius = UDim.new(0, 12)}, frame)
-	create("UIStroke", {Color = theme.Border, Transparency = 0.45, Thickness = 1}, frame)
+	style.Surface(frame)
 end
 local function text(parent, message, size, position, dimensions, color)
 	return create("TextLabel", {Text = message, TextSize = size, Font = Enum.Font.GothamMedium,
@@ -32,7 +32,7 @@ local function button(parent, title, position, size, callback)
 	local value = create("TextButton", {Text = title, Font = Enum.Font.GothamBold, TextSize = 14,
 		TextColor3 = theme.Text, BackgroundColor3 = theme.Raised, BorderSizePixel = 0,
 		Position = position, Size = size, AutoButtonColor = true, Selectable = true}, parent)
-	surface(value)
+	style.Button(value)
 	value.Activated:Connect(callback)
 	return value
 end

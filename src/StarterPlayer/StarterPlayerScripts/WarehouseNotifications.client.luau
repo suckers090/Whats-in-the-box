@@ -5,6 +5,7 @@ local Players = game:GetService("Players")
 local RS = game:GetService("ReplicatedStorage")
 
 local theme = require(RS:WaitForChild("UITheme"))
+local style = require(RS:WaitForChild("UIStyle"))
 local TweenService = game:GetService("TweenService")
 local player = Players.LocalPlayer
 local event = RS:WaitForChild("WarehouseNotice")
@@ -30,9 +31,7 @@ local size = Instance.new("UISizeConstraint")
 size.MaxSize = Vector2.new(430, 65)
 size.Parent = message
 
-Instance.new("UICorner", message).CornerRadius = UDim.new(0, 10)
-
-local border = Instance.new("UIStroke")
+local border = style.Surface(message, 10)
 border.Color = theme.Accent
 border.Transparency = 0.4
 border.Parent = message
@@ -46,11 +45,16 @@ event.OnClientEvent:Connect(function(text)
 	message.Visible = true
 	message.BackgroundTransparency = 1
 	message.TextTransparency = 1
+	border.Transparency = 0.05
 	TweenService:Create(message, TweenInfo.new(0.18), {BackgroundTransparency = 0.08, TextTransparency = 0}):Play()
+	TweenService:Create(border, TweenInfo.new(0.65), {Transparency = 0.4}):Play()
 
 	task.delay(3, function()
 		if notificationId == thisId then
-			message.Visible = false
+			TweenService:Create(message, TweenInfo.new(0.2), {BackgroundTransparency = 1, TextTransparency = 1}):Play()
+			task.delay(0.2, function()
+				if notificationId == thisId then message.Visible = false end
+			end)
 		end
 	end)
 end)
