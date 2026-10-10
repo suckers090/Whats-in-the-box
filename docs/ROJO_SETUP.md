@@ -2,7 +2,7 @@
 
 Rojo copies script source from a folder on your computer into Roblox Studio. The cloud workspace cannot connect directly to Studio on your PC. Your local copy of this GitHub repository is the bridge.
 
-Use Rojo 7.5.1 for both the command-line program and Studio plugin. Gameplay code has not changed in this setup. The existing gameplay test copy was reported working in Studio by the user; the assistant verified Rojo build/server behavior outside Studio only.
+Use Rojo 7.5.1 for both the command-line program and Studio plugin. The initial Rojo setup did not change gameplay code. The subsequent door update adds WarehouseDoors; see docs/DOOR_TESTING.md. The existing gameplay test copy was reported working in Studio by the user; the assistant verified Rojo build/server behavior outside Studio only.
 
 ## 1. Get the project folder
 
@@ -40,14 +40,15 @@ The project intentionally maps only:
 
 - ServerScriptService/WarehousePrototype
 - ServerScriptService/ScannerUpgrade
+- ServerScriptService/WarehouseDoors
 - StarterPlayer/StarterPlayerScripts/BoxClient
 - StarterPlayer/StarterPlayerScripts/WarehouseNotifications
 
-All four are enabled with Legacy RunContext, matching the prepared gameplay test. Workspace, the Blender model, WarehouseMarkers, spawn, and other services are not mapped. Every mapped container and script preserves unknown children through $ignoreUnknownInstances. Do not accept unexpected deletions or a plan to replace the warehouse. Stop and send a screenshot if the proposed changes exceed these four scripts and their existing containers.
+All mapped scripts are enabled with Legacy RunContext, matching the prepared gameplay test. Workspace, the Blender model, WarehouseMarkers, spawn, and other services are not mapped. Every mapped container and script preserves unknown children through $ignoreUnknownInstances. Do not accept unexpected deletions or a plan to replace the warehouse. Stop and send a screenshot if the proposed changes exceed these mapped scripts and their existing containers.
 
 ## 4. Test the first connection
 
-With Play stopped, check that your model and WarehouseMarkers remain present and that each of the four scripts appears only once in its expected location.
+With Play stopped, check that your model and WarehouseMarkers remain present and that each of the mapped scripts appears only once in its expected location.
 
 To verify live updates, open src/StarterPlayer/StarterPlayerScripts/WarehouseNotifications.client.luau in a text editor or VS Code. Add a harmless comment at the end, such as `-- Rojo connection check`, and save. Look for the comment in the same script in Studio without manually pasting it. Remove the comment in the local file and save again; verify it disappears in Studio. This is only a sync check.
 
@@ -55,7 +56,7 @@ Then press Play and repeat the delivery, reveal, keep/sell, sealed-sale and scan
 
 ## Daily workflow
 
-Treat src files as the source of truth for these four mapped scripts. Edit them in your local project and run Rojo while working. Editing a mapped script only in Studio can be overwritten by later sync. Continue modeling and moving markers in Studio; save the place separately because Rojo does not track those objects.
+Treat src files as the source of truth for these mapped scripts. Edit them in your local project and run Rojo while working. Editing a mapped script only in Studio can be overwritten by later sync. Continue modeling and moving markers in Studio; save the place separately because Rojo does not track those objects.
 
 Use Ctrl+C in PowerShell to stop Rojo. Start the same serve command next time. You can install VS Code and its Luau tooling later; they are optional for this first connection.
 
@@ -73,3 +74,5 @@ Changes made by Codex reach your local files through GitHub, not automatically t
 ## Checks performed by the assistant
 
 Rojo 7.5.1 successfully built the project and generated a sourcemap. The build contains exactly the four intended scripts with byte-equivalent decoded source, Disabled=false and Legacy RunContext. The serve API returned the expected hierarchy and ignoreUnknownInstances=true at every mapped node. The temporary cloud server was stopped after validation. No first-sync or gameplay test in Studio was performed by the assistant.
+
+The current mapping also includes WarehouseDoors. The checks above describe the initial four-script Rojo setup; the door update separately passed compilation and a five-script Rojo build.

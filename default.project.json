@@ -21,6 +21,14 @@
           "Disabled": false,
           "RunContext": "Legacy"
         }
+      },
+      "WarehouseDoors": {
+        "$path": "src/ServerScriptService/WarehouseDoors.server.luau",
+        "$ignoreUnknownInstances": true,
+        "$properties": {
+          "Disabled": false,
+          "RunContext": "Legacy"
+        }
       }
     },
     "StarterPlayer": {

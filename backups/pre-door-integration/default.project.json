@@ -1,0 +1,51 @@
+{
+  "name": "Whats-in-the-box",
+  "tree": {
+    "$className": "DataModel",
+    "$ignoreUnknownInstances": true,
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "$ignoreUnknownInstances": true,
+      "WarehousePrototype": {
+        "$path": "src/ServerScriptService/WarehousePrototype.server.luau",
+        "$ignoreUnknownInstances": true,
+        "$properties": {
+          "Disabled": false,
+          "RunContext": "Legacy"
+        }
+      },
+      "ScannerUpgrade": {
+        "$path": "src/ServerScriptService/ScannerUpgrade.server.luau",
+        "$ignoreUnknownInstances": true,
+        "$properties": {
+          "Disabled": false,
+          "RunContext": "Legacy"
+        }
+      }
+    },
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "$ignoreUnknownInstances": true,
+      "StarterPlayerScripts": {
+        "$className": "StarterPlayerScripts",
+        "$ignoreUnknownInstances": true,
+        "BoxClient": {
+          "$path": "src/StarterPlayer/StarterPlayerScripts/BoxClient.client.luau",
+          "$ignoreUnknownInstances": true,
+          "$properties": {
+            "Disabled": false,
+            "RunContext": "Legacy"
+          }
+        },
+        "WarehouseNotifications": {
+          "$path": "src/StarterPlayer/StarterPlayerScripts/WarehouseNotifications.client.luau",
+          "$ignoreUnknownInstances": true,
+          "$properties": {
+            "Disabled": false,
+            "RunContext": "Legacy"
+          }
+        }
+      }
+    }
+  }
+}
