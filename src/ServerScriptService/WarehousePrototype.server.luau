@@ -16,12 +16,15 @@ local rng = Random.new()
 local sessions, loading = {}, {}
 local Profiles = require(script.Parent:WaitForChild("PlayerProfiles"))
 local Inventory = require(script.Parent:WaitForChild("InventoryState"))(items)
+local Collection = require(script.Parent:WaitForChild("CollectionProgress"))(items,
+	require(RS:WaitForChild("CollectionMilestones")))
 local function pushState(player)
 	local data = sessions[player]
 	if not data or player.Parent ~= Players then return end
 	local plot = Registry.Get(player)
 	stateEvent:FireClient(player, {
 		inventory = data.inventory, discoveries = data.discoveries,
+		collectionClaims = data.collectionClaims,
 		plot = plot and plot.Slot or 0, scanner = plot and plot.ScannerUnlocked or false,
 	})
 end
@@ -51,6 +54,12 @@ stateEvent.OnServerEvent:Connect(function(player, action, id)
 	data.lastRequest = now
 	if action == "RequestState" then
 		pushState(player)
+	elseif action == "ClaimCollection" then
+		local earned, reason = Collection.Claim(data, id)
+		if earned == nil then notice:FireClient(player, reason); return end
+		player.leaderstats.Cash.Value += earned
+		pushState(player)
+		notice:FireClient(player, "Collection milestone / +$" .. earned)
 	elseif action == "SellInventory" then
 		local earned = Inventory.Sell(data, id)
 		if earned == nil then return end
@@ -352,7 +361,8 @@ local function setupPlayer(player)
 	profile.Snapshot = function()
 		local currentPlot = Registry.Get(player)
 		return {cash = cash.Value, inventory = data.inventory, discoveries = data.discoveries,
-			scanner = currentPlot and currentPlot.ScannerUnlocked or data.scanner, pending = data.pending}
+			scanner = currentPlot and currentPlot.ScannerUnlocked or data.scanner, pending = data.pending,
+			collectionClaims = data.collectionClaims}
 	end
 	local plot = Registry.Assign(player, profile.Data.scanner)
 	if profile.Recovered then

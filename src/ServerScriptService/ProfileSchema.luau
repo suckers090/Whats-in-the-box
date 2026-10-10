@@ -4,7 +4,7 @@ return function(catalog)
 	for _, item in ipairs(catalog) do known[item.id] = true end
 	local schema = {}
 	function schema.New()
-		return {cash = 0, inventory = {}, discoveries = {}, scanner = false, pending = nil}
+		return {cash = 0, inventory = {}, discoveries = {}, scanner = false, pending = nil, collectionClaims = {}}
 	end
 	local function integer(value, limit)
 		return type(value) == "number" and value == value and value >= 0 and value <= limit and value % 1 == 0
@@ -28,8 +28,21 @@ return function(catalog)
 		if data.pending ~= nil and (type(data.pending) ~= "string" or not known[data.pending]) then
 			return nil, "Unknown pending reward"
 		end
+		-- Old v1 saves have no claims field. Preserve valid future milestone IDs.
+		local claims = {}
+		if data.collectionClaims ~= nil then
+			if type(data.collectionClaims) ~= "table" then return nil, "Invalid collection claims" end
+			local size = 0
+			for id, claimed in pairs(data.collectionClaims) do
+				size += 1
+				if size > 256 or type(id) ~= "string" or #id < 1 or #id > 64 or claimed ~= true then
+					return nil, "Invalid collection claims"
+				end
+				claims[id] = true
+			end
+		end
 		return {cash = data.cash, inventory = inventory, discoveries = discoveries,
-			scanner = data.scanner, pending = data.pending}
+			scanner = data.scanner, pending = data.pending, collectionClaims = claims}
 	end
 	function schema.Recover(data)
 		local copy, reason = schema.Validate(data)

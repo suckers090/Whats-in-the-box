@@ -78,11 +78,13 @@ profile.Data.cash = 4000
 profile.Data.inventory.gold_watch = 2
 profile.Data.discoveries.gold_watch = 2
 profile.Data.scanner = true
+profile.Data.collectionClaims.first_find = true
 profile.Snapshot = function() return profile.Data end
 mutateDuringWrite = function() profile.Data.cash = 5000; profile.Data.inventory.gold_watch = 3 end
 assert(service.Save(owner, false))
 assert(records.player_1.data.cash == 4000 and records.player_1.data.inventory.gold_watch == 2,
     "Snapshot must freeze related values before a yielding write")
+assert(records.player_1.data.collectionClaims.first_find, "Claim receipt must save with cash")
 local beforeFailure = records.player_1
 failures = 3
 assert(not service.Save(owner, false))
@@ -94,6 +96,7 @@ service.Close(owner)
 assert(records.player_1.lock == nil and service.Get(owner) == nil)
 local rejoined = service.Load(owner)
 assert(rejoined.Data.cash == 5000 and rejoined.Data.inventory.gold_watch == 3 and rejoined.Data.scanner)
+assert(rejoined.Data.collectionClaims.first_find, "Actual profile service must restore reward receipts")
 rejoined.Data.pending = "gold_watch"
 service.Close(owner)
 local recovered = service.Load(owner)

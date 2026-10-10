@@ -2,6 +2,10 @@
 
 Existing Roblox warehouse mystery-package game.
 
+See the [current gameplay audit and roadmap](docs/GAMEPLAY_ROADMAP.md). The next
+stage adds [one-time collection milestones](docs/COLLECTION_MILESTONES.md) to the
+existing Index, preserving v1 saves and the working warehouse gameplay.
+
 The current test release adds persistent profiles to the shared-map warehouse plots and industrial HUD. Follow [persistence setup and testing](docs/PERSISTENCE_TESTING.md) when updating your local project. Ordinary Studio sessions default to preview mode with saving off; real Roblox saves require validation in a private test experience. Studio models and markers stay in the saved place; the gameplay/UI scripts live in src.
 
 Start with [Windows Rojo setup](docs/ROJO_SETUP.md) to connect this folder to a separate copy of the working Studio place. [Marker integration testing](docs/MARKER_TEST.md) explains the current gameplay checks and placement markers.

@@ -7,9 +7,10 @@ local GuiService = game:GetService("GuiService")
 local player = Players.LocalPlayer
 local theme = require(RS:WaitForChild("UITheme"))
 local catalog = require(RS:WaitForChild("ItemCatalog"))
+local milestones = require(RS:WaitForChild("CollectionMilestones"))
 local event = RS:WaitForChild("WarehouseState")
 local boxEvent = RS:WaitForChild("BoxEvent")
-local state = {inventory = {}, discoveries = {}, plot = 0, scanner = false}
+local state = {inventory = {}, discoveries = {}, collectionClaims = {}, plot = 0, scanner = false}
 local currentTab, revealActive, previousSelection = nil, false, nil
 local function create(class, properties, parent)
 	local value = Instance.new(class)
@@ -145,11 +146,36 @@ local function render()
 	if currentTab == "Index" then
 		title.Text = "COLLECTION INDEX"
 		subtitle.Text = found .. " / " .. #catalog .. " discovered  •  " .. math.floor(found / #catalog * 100) .. "% complete"
+		for index, milestone in ipairs(milestones) do
+			local claimed = state.collectionClaims[milestone.id] == true
+			local eligible = found >= milestone.required
+			local frame = card(milestone.name,
+				math.min(found, milestone.required) .. " / " .. milestone.required .. " different finds\nReward: $" .. milestone.reward,
+				claimed and theme.Muted or theme.Accent, index)
+			if eligible and not claimed then
+				local claimButton
+				claimButton = button(frame, "CLAIM $" .. milestone.reward, UDim2.new(0, 14, 1, -40), UDim2.new(1, -28, 0, 30), function()
+					claimButton.Active = false
+					claimButton.Text = "CHECKING..."
+					event:FireServer("ClaimCollection", milestone.id)
+					-- Re-enable if the server is paused or a request was rate limited.
+					task.delay(1, function()
+						if claimButton.Parent then
+							claimButton.Active = true
+							claimButton.Text = "CLAIM $" .. milestone.reward
+						end
+					end)
+				end)
+			else
+				text(frame, claimed and "CLAIMED" or "KEEP DISCOVERING", 10,
+					UDim2.new(0, 14, 1, -31), UDim2.new(1, -28, 0, 20), theme.Muted)
+			end
+		end
 		for index, item in ipairs(catalog) do
 			local unlocked = (state.discoveries[item.id] or 0) > 0
 			local frame = card(unlocked and item.name or "UNDISCOVERED",
 				item.rarity:upper() .. (unlocked and ("  •  $" .. item.value .. "\nOpened " .. state.discoveries[item.id] .. " times") or "\nOpen packages to discover this item"),
-				unlocked and theme.Rarity[item.rarity] or theme.Muted, index)
+				unlocked and theme.Rarity[item.rarity] or theme.Muted, #milestones + index)
 			text(frame, unlocked and "DISCOVERED" or "LOCKED", 10, UDim2.new(0, 14, 1, -31), UDim2.new(1, -28, 0, 20), theme.Muted)
 		end
 	elseif currentTab == "Inventory" then
