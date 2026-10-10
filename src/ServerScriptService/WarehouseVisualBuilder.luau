@@ -3,12 +3,12 @@ local Lighting = game:GetService("Lighting")
 return function(theme, config)
 	local builder = {}
 	local bound = setmetatable({}, {__mode = "k"})
-	function builder.ApplyLighting()
+	function builder.ApplyLighting(refineExisting)
 		if config.LightingEnabled then
-			Lighting.ClockTime = 16.2
-			Lighting.Brightness = 2.5
-			Lighting.Ambient = Color3.fromRGB(91, 102, 118)
-			Lighting.OutdoorAmbient = Color3.fromRGB(116, 129, 145)
+			Lighting.ClockTime = 14.3
+			Lighting.Brightness = 2.1
+			Lighting.Ambient = Color3.fromRGB(105, 104, 100)
+			Lighting.OutdoorAmbient = Color3.fromRGB(125, 126, 122)
 			Lighting.ExposureCompensation = 0
 			Lighting.EnvironmentDiffuseScale = 0.8
 			Lighting.EnvironmentSpecularScale = 0.65
@@ -16,17 +16,24 @@ return function(theme, config)
 			Lighting.ShadowSoftness = 0.35
 			-- Respect an existing artist-authored effect rather than stack another of its class.
 			local function effect(class, name, properties)
-				if Lighting:FindFirstChildOfClass(class) then return end
+				local existing = Lighting:FindFirstChildOfClass(class)
+				if existing then
+					-- Update only our generated effects on an explicit editor polish.
+					if refineExisting and existing:GetAttribute("WITB_VisualEffect") == 1 and existing.Name == name then
+						for key, property in pairs(properties) do existing[key] = property end
+					end
+					return
+				end
 				local value = Instance.new(class)
 				value.Name = name
 				value:SetAttribute("WITB_VisualEffect", 1)
 				for key, property in pairs(properties) do value[key] = property end
 				value.Parent = Lighting
 			end
-			effect("Atmosphere", "WITB_Atmosphere", {Density = 0.18, Offset = 0.15,
-				Color = Color3.fromRGB(198, 211, 224), Decay = Color3.fromRGB(142, 153, 169), Haze = 0.6, Glare = 0})
+			effect("Atmosphere", "WITB_Atmosphere", {Density = 0.12, Offset = 0.15,
+				Color = Color3.fromRGB(208, 205, 195), Decay = Color3.fromRGB(153, 158, 159), Haze = 0.3, Glare = 0})
 			effect("ColorCorrectionEffect", "WITB_Grade", {Brightness = 0.01, Contrast = 0.06,
-				Saturation = -0.06, TintColor = Color3.fromRGB(247, 250, 255)})
+				Saturation = -0.03, TintColor = Color3.fromRGB(255, 251, 244)})
 			effect("BloomEffect", "WITB_Bloom", {Intensity = 0.12, Size = 18, Threshold = 1.8})
 		end
 	end

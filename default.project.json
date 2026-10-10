@@ -89,6 +89,12 @@
       "WarehouseExteriorBuilder": {
         "$path": "src/ServerScriptService/WarehouseExteriorBuilder.luau",
         "$ignoreUnknownInstances": true
+      },
+      "FacilityLayout": {
+        "$path": "src/ServerScriptService/FacilityLayout.luau"
+      },
+      "FacilityPolish": {
+        "$path": "src/ServerScriptService/FacilityPolish.luau"
       }
     },
     "StarterPlayer": {
@@ -184,6 +190,12 @@
         },
         "YardLayout": {
           "$path": "src/ServerScriptService/YardLayout.luau"
+        },
+        "FacilityLayout": {
+          "$path": "src/ServerScriptService/FacilityLayout.luau"
+        },
+        "FacilityPolish": {
+          "$path": "src/ServerScriptService/FacilityPolish.luau"
         }
       }
     }

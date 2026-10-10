@@ -18,6 +18,12 @@
     },
     "YardLayout": {
       "$path": "src/ServerScriptService/YardLayout.luau"
+    },
+    "FacilityLayout": {
+      "$path": "src/ServerScriptService/FacilityLayout.luau"
+    },
+    "FacilityPolish": {
+      "$path": "src/ServerScriptService/FacilityPolish.luau"
     }
   }
 }

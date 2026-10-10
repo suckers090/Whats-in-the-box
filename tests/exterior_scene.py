@@ -15,8 +15,8 @@ prefix = next(node.value.value for node in tree.body if isinstance(node, ast.Ass
               and isinstance(node.value, ast.Constant))
 prefix = prefix.replace('local workspace={}', 'local workspace={children={}}')
 prefix += r'''
-Enum.Material.Asphalt='Asphalt'; Enum.Material.Grass='Grass'
-Enum.PartType={Ball='Ball'}
+Enum.Material.Asphalt='Asphalt'; Enum.Material.Grass='Grass'; Enum.Material.DiamondPlate='DiamondPlate'
+Enum.PartType={Ball='Ball',Cylinder='Cylinder'}; Enum.NormalId.Left='Left'
 local vectorMT={__sub=function(a,b) return Vector3.new(a.X-b.X,a.Y-b.Y,a.Z-b.Z) end}
 Vector3.new=function(x,y,z) return setmetatable(triple(x,y,z),vectorMT) end
 local typeof=function(value)
@@ -43,6 +43,7 @@ local grid=node('Texture','Texture',plate); grid.Transparency=0
 local legacy=node('SpawnLocation','SpawnLocation',workspace); legacy.CanCollide=true; legacy.Transparency=0
 local star=node('Decal','SpawnLogo',legacy); star.Transparency=0
 local layout=require('./YardLayout')
+local facilityLayout=require('./FacilityLayout')
 local originals={}
 local function references(target, shiftX, shiftZ)
 '''
@@ -75,6 +76,9 @@ local function run()
 source = (root / 'src/ServerScriptService/WarehouseExterior.server.luau').read_text()
 source = source.replace('require(script.Parent:WaitForChild("WarehouseExteriorBuilder"))', 'loadExteriorBuilder()')
 source = 'local function loadExteriorBuilder()\n' + (root / 'src/ServerScriptService/WarehouseExteriorBuilder.luau').read_text() + '\nend\n' + source
+source = source.replace('require(script.Parent:WaitForChild("FacilityPolish"))', 'loadFacility()')
+source = 'local function loadFacility()\n' + (root / 'src/ServerScriptService/FacilityPolish.luau').read_text() + '\nend\n' + source
+source = source.replace('require(script.Parent:WaitForChild("FacilityLayout"))', 'facilityLayout')
 source = source.replace('require(RS:WaitForChild("VisualConfig"))', 'config')
 source = source.replace('require(script.Parent:WaitForChild("PlotRegistry"))', 'registry')
 source = source.replace('require(script.Parent:WaitForChild("YardLayout"))', 'layout')
@@ -106,6 +110,10 @@ callback(second)
 assert(#park.children==2,'Another plot in a row must share the road and lights')
 local folder=second.Runtime:FindFirstChild('ExteriorPolish')
 assert(#folder.children==23)
+local facilities=second.Runtime:FindFirstChild('FacilityPolish')
+assert(facilities and facilities.ParkedDeliveryVan and facilities.ParkedDeliveryVan.CargoBody.Anchored)
+assert(facilities.ParkedDeliveryVan.Tyre.Shape=='Cylinder')
+assert(section:FindFirstChild('FacilityPolish'))
 local lights=0
 for _,value in ipairs(park:GetDescendants()) do
  if value:IsA('BasePart') then
@@ -119,11 +127,16 @@ count=#all
 run()
 assert(#all==count and edited.Color=='ArtistPaint','Fresh runtime must reuse saved roads and preserve edits')
 local indicatorCount=#all
-config.WorldEnabled=false; run(); assert(#all==indicatorCount)
+config.FacilityDetailsEnabled=false
+local third={Model=node('Model','Warehouse_3',workspace),Markers={},Slot=7}
+third.Runtime=node('Folder','WarehousePrototype',third.Model); references(third,180,140)
+callback(third); assert(not third.Runtime:FindFirstChild('FacilityPolish'))
+indicatorCount=#all; config.WorldEnabled=false; run(); assert(#all==indicatorCount)
 print('PASS: actual exterior setup, arbitrary snapshot order, shared rows/idempotence, imported asset/physics preservation and toggles')
 '''
 with tempfile.TemporaryDirectory() as directory:
     shutil.copyfile(root / 'src/ServerScriptService/YardLayout.luau', Path(directory) / 'YardLayout.luau')
+    shutil.copyfile(root / 'src/ServerScriptService/FacilityLayout.luau', Path(directory) / 'FacilityLayout.luau')
     driver = Path(directory) / 'exterior.luau'
     driver.write_text(prefix + source + checks)
     subprocess.run([sys.argv[1], str(driver)], check=True)

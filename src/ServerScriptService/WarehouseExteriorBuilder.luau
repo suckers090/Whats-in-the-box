@@ -12,6 +12,15 @@ return function(config, layout)
 		Lamp = {Color3.fromRGB(227, 234, 244), Enum.Material.Neon},
 		Grass = {Color3.fromRGB(81, 98, 80), Enum.Material.Grass},
 		Foliage = {Color3.fromRGB(58, 83, 70), Enum.Material.Grass},
+		Wood = {Color3.fromRGB(132, 111, 82), Enum.Material.Wood},
+		Freight = {Color3.fromRGB(166, 155, 129), Enum.Material.SmoothPlastic},
+		Vehicle = {Color3.fromRGB(178, 178, 167), Enum.Material.Metal},
+		VehicleLamp = {Color3.fromRGB(224, 215, 184), Enum.Material.SmoothPlastic},
+		Glass = {Color3.fromRGB(44, 58, 65), Enum.Material.SmoothPlastic},
+		Rubber = {Color3.fromRGB(25, 28, 29), Enum.Material.SmoothPlastic},
+		Waste = {Color3.fromRGB(65, 81, 69), Enum.Material.Metal},
+		Facade = {Color3.fromRGB(126, 125, 114), Enum.Material.Concrete},
+		Fence = {Color3.fromRGB(115, 123, 119), Enum.Material.DiamondPlate},
 	}
 	local park, origin
 	local rows = {}
@@ -25,10 +34,12 @@ return function(config, layout)
 		value.Anchored = true; value.CanCollide = descriptor.collidable == true
 		value.CanTouch = false; value.CanQuery = descriptor.collidable == true
 		value.CastShadow = false; value.Parent = parent
+		value.Transparency = descriptor.transparency or 0
+		if descriptor.shape then value.Shape = Enum.PartType[descriptor.shape] end
 		if descriptor.name == "Shrub" then value.Shape = Enum.PartType.Ball end
 		if descriptor.text then
 			local sign = Instance.new("SurfaceGui")
-			sign.Face = Enum.NormalId.Front
+			sign.Face = descriptor.face and Enum.NormalId[descriptor.face] or Enum.NormalId.Front
 			sign.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud; sign.PixelsPerStud = 80
 			sign.MaxDistance = 85; sign.LightInfluence = 0.3; sign.Parent = value
 			local text = Instance.new("TextLabel")
@@ -43,6 +54,21 @@ return function(config, layout)
 			light.Parent = value
 		end
 		return value
+	end
+	function builder.BuildParts(descriptors, base, parent)
+		local groups = {}
+		for _, descriptor in ipairs(descriptors) do
+			local target = parent
+			if descriptor.group then
+				if not groups[descriptor.group] then
+					local model = Instance.new("Model")
+					model.Name = descriptor.group; model.Parent = parent
+					groups[descriptor.group] = model
+				end
+				target = groups[descriptor.group]
+			end
+			make(descriptor, base, target)
+		end
 	end
 	function builder.FinishBaseplate()
 		if config.BaseplateFinishEnabled == false then return end

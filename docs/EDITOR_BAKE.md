@@ -1,5 +1,8 @@
 # Editable industrial scenery in Studio
 
+For the next environment stage, use [Polish facility](FACILITY_POLISH.md), which
+adds logistics details and neutral daylight without clearing your existing bake.
+
 This update turns the existing runtime art into an optional, saved Studio scene.
 It adds no new gameplay or save fields. The Blender warehouse, markers, HUD,
 package logic and persistence modules are preserved. The original visual scripts

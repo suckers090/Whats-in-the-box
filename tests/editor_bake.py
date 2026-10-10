@@ -16,9 +16,9 @@ prefix = next(node.value.value for node in tree.body if isinstance(node, ast.Ass
               and isinstance(node.value, ast.Constant))
 prefix = prefix.replace('local workspace={}', 'local workspace={children={}}')
 prefix += r'''
-Enum.Material.Asphalt='Asphalt'; Enum.Material.Grass='Grass'
+Enum.Material.Asphalt='Asphalt'; Enum.Material.Grass='Grass'; Enum.Material.DiamondPlate='DiamondPlate'
 Enum.Material.Plastic={Name='Plastic',isEnum=true}
-Enum.PartType={Ball='Ball'}
+Enum.PartType={Ball='Ball',Cylinder='Cylinder'}; Enum.NormalId.Left='Left'
 Enum.FinishRecordingOperation={Commit='Commit',Cancel='Cancel'}
 local vectorMT={__sub=function(a,b) return Vector3.new(a.X-b.X,a.Y-b.Y,a.Z-b.Z) end}
 Vector3.new=function(x,y,z) return setmetatable(triple(x,y,z),vectorMT) end
@@ -85,13 +85,14 @@ for item in place.iter('Item'):
     prefix += 'do local p=node("MeshPart",'+repr(name.text)+','+parent+'); '
     prefix += 'p.CFrame=CFrame.new('+','.join(map(str, xyz))+'); p.Size=Vector3.new('+','.join(map(str, dimensions))+'); '
     prefix += 'p.Color="OriginalMeshColor"; p.Material=Enum.Material.Plastic; p.CanCollide=true; p.Transparency=0; end\n'
-prefix += 'local layout=require("./YardLayout")\n'
+prefix += 'local layout=require("./YardLayout")\nlocal facilityLayout=require("./FacilityLayout")\n'
 for fn, path in [('loadVisualBuilder', 'src/ServerScriptService/WarehouseVisualBuilder.luau'),
                  ('loadExteriorBuilder', 'src/ServerScriptService/WarehouseExteriorBuilder.luau'),
+                 ('loadFacility', 'src/ServerScriptService/FacilityPolish.luau'),
                  ('loadBake', 'studio-tools/VisualBake.luau')]:
     prefix += f'local function {fn}()\n'+(root / path).read_text()+'\nend\n'
 prefix += r'''
-local api=loadBake()(loadVisualBuilder(),loadExteriorBuilder(),layout,theme,config)
+local api=loadBake()(loadVisualBuilder(),loadExteriorBuilder(),layout,theme,config,loadFacility(),facilityLayout)
 local count=#all
 running=true; assert(not api.Bake()); assert(#all==count and recordCount==0)
 running=false; busy=true; assert(not api.Bake()); assert(#all==count)
@@ -107,6 +108,24 @@ assert(foreign.Contrast==0.77 and plot.Model:FindFirstChild('GarageDoor_Panel').
 count=#all; assert(not api.Bake()); assert(#all==count and backup.Parent==Storage,'Repeated bake must retain edited scenery')
 local visual=decor:FindFirstChild('VisualPolish'); visual:FindFirstChild('FloorFinish').Color='ArtistFloor'
 local road=park:FindFirstChild('EstateRow_0'):FindFirstChild('RoadCenterDash'); road.Color='ArtistRoad'
+Lighting.ClockTime=18.1
+local atmosphere=Lighting:FindFirstChildOfClass('Atmosphere')
+atmosphere.Density=0.2
+count=#all; running=true; assert(not api.Polish() and #all==count); running=false
+assert(api.Polish())
+local facilities=decor:FindFirstChild('FacilityPolish')
+local stage=Storage:FindFirstChild('WITB_FacilityBakeBackup')
+assert(facilities and stage and Lighting.ClockTime==14.3 and atmosphere.Density==0.12)
+assert(Lighting.Ambient.X > Lighting.Ambient.Z,'Ambient should be neutral rather than blue')
+assert(foreign.Contrast==0.77,'Artist-authored grading must remain unchanged')
+assert(visual.FloorFinish.Color=='ArtistFloor' and road.Color=='ArtistRoad','Additive polish must retain old edits')
+facilities.ParkedDeliveryVan.CargoBody.Color='ArtistVan'
+count=#all; assert(not api.Polish() and #all==count,'Repeat polish must preserve new edits')
+local deletedRef=node('ObjectValue','DeletedOriginalEffect',stage.ExistingLighting); deletedRef.Value=nil
+assert(api.ClearPolish())
+assert(not decor:FindFirstChild('FacilityPolish') and not park.EstateRow_0:FindFirstChild('FacilityPolish'))
+assert(Lighting.ClockTime==18.1 and atmosphere.Density==0.2 and visual.FloorFinish.Color=='ArtistFloor' and road.Color=='ArtistRoad','Clear only the added stage, restoring previous lighting')
+assert(api.Polish()); decor.FacilityPolish.ParkedDeliveryVan.CargoBody.Color='ArtistVan'
 Lighting.ClockTime=18.1
 local building=plot.Model:Clone(); building.Name='RuntimeClone'; building.Parent=workspace
 local runtime=node('Folder','WarehousePrototype',building)
@@ -129,12 +148,15 @@ for path in ('WarehouseVisuals.server.luau', 'WarehouseExterior.server.luau'):
                                   ('require(script.Parent:WaitForChild("PlotRegistry"))', 'registry'),
                                   ('require(script.Parent:WaitForChild("WarehouseVisualBuilder"))', 'loadVisualBuilder()'),
                                   ('require(script.Parent:WaitForChild("WarehouseExteriorBuilder"))', 'loadExteriorBuilder()'),
-                                  ('require(script.Parent:WaitForChild("YardLayout"))', 'layout')]:
+                                  ('require(script.Parent:WaitForChild("YardLayout"))', 'layout'),
+                                  ('require(script.Parent:WaitForChild("FacilityPolish"))', 'loadFacility()'),
+                                  ('require(script.Parent:WaitForChild("FacilityLayout"))', 'facilityLayout')]:
         source = source.replace(original, replacement)
     prefix += 'do\n'+source+'\nend\n'
 checks = r'''
 assert(#all==count and Lighting.ClockTime==18.1 and road.Color=='ArtistRoad','Runtime must preserve edited baked art and lighting without duplication')
 assert(runtime.VisualPolish.FloorFinish.Color=='ArtistFloor')
+assert(runtime.FacilityPolish.ParkedDeliveryVan.CargoBody.Color=='ArtistVan','Baked facility models must clone and retain edits')
 assert(runtime.VisualPolish.DockSign.children[1].children[1].Text=='BAY 02  /  WITB','Cloned bay label must match owner slot')
 local door=building:FindFirstChild('GarageDoor_Panel')
 local indicator=runtime.VisualPolish:FindFirstChild('DoorStatus_GarageDoor_Panel')
@@ -142,7 +164,7 @@ door:SetAttribute('DoorBusy',true); assert(indicator.Color.X==215,'Cloned door l
 door:SetAttribute('DoorBusy',false); door:SetAttribute('DoorOpen',true); assert(indicator.Color==theme.Success)
 building:Destroy()
 assert(api.Clear()); assert(lastOperation=='Commit')
-assert(not Storage:FindFirstChild('WITB_VisualBakeBackup') and not plot.Model:FindFirstChild('WITB_BakedDecor') and not workspace:FindFirstChild('IndustrialParkRuntime'))
+assert(not Storage:FindFirstChild('WITB_FacilityBakeBackup') and not Storage:FindFirstChild('WITB_VisualBakeBackup') and not plot.Model:FindFirstChild('WITB_BakedDecor') and not workspace:FindFirstChild('IndustrialParkRuntime'))
 assert(Lighting.ClockTime==14.5 and Lighting.Brightness==3 and Lighting:GetAttribute('WITB_VisualBakeVersion')==nil)
 assert(#Lighting.children==1 and Lighting.children[1]==foreign and foreign.Contrast==0.77)
 assert(plate.Color=='OriginalGrass' and plate.Material==Enum.Material.Plastic and grid.Transparency==0 and spawn.Transparency==0 and star.Transparency==0)
@@ -154,12 +176,24 @@ local failure=loadBake()(function()
 end,loadExteriorBuilder(),layout,theme,config)
 assert(not failure.Bake() and lastOperation=='Cancel')
 assert(Lighting.Brightness==3 and grid.Transparency==0 and not Storage:FindFirstChild('WITB_VisualBakeBackup') and not workspace:FindFirstChild('IndustrialParkRuntime') and not plot.Model:FindFirstChild('WITB_BakedDecor'),'Failed bake must roll back all owned changes')
+assert(api.Bake())
+local partial=loadBake()(loadVisualBuilder(),loadExteriorBuilder(),layout,theme,config,function()
+ return {Decorate=function(p,park,created)
+  local folder=node('Folder','FacilityPolish',p.Runtime); created(folder)
+  Lighting.Brightness=0; error('Injected partial facility failure')
+ end}
+end,facilityLayout)
+local originalBrightness=Lighting.Brightness
+assert(not partial.Polish() and lastOperation=='Cancel')
+assert(Lighting.Brightness==originalBrightness and not Storage:FindFirstChild('WITB_FacilityBakeBackup') and not plot.Model.WITB_BakedDecor:FindFirstChild('FacilityPolish'),'Failed polish must roll back its partial layer and preserve original bake')
+assert(api.Clear())
 local foreignPark=node('Folder','IndustrialParkRuntime',workspace)
 assert(not api.Bake() and foreignPark.Parent==workspace,'Do not overwrite unmanaged scenery')
-print('PASS: actual editor bake/clear, Play/busy guards, rollback, backup/enum restoration, edited baked runtime reuse and cloned door/bay rebinding')
+print('PASS: editor bake and additive facility stage, separate clear/lighting restoration, idempotence, partial-failure rollback, edited cloned runtime reuse and door/bay rebinding')
 '''
 with tempfile.TemporaryDirectory() as directory:
     shutil.copyfile(root / 'src/ServerScriptService/YardLayout.luau', Path(directory) / 'YardLayout.luau')
+    shutil.copyfile(root / 'src/ServerScriptService/FacilityLayout.luau', Path(directory) / 'FacilityLayout.luau')
     driver = Path(directory) / 'bake.luau'
     driver.write_text(prefix + checks)
     subprocess.run([sys.argv[1], str(driver)], check=True)

@@ -10,12 +10,14 @@ local RS = game:GetService("ReplicatedStorage")
 local toolbar = plugin:CreateToolbar("WITB Art")
 local bake = toolbar:CreateButton("WITB_Bake", "Generate editable scenery and preserve original art with Undo", "", "Bake visuals")
 local clear = toolbar:CreateButton("WITB_Clear", "Remove generated scenery and restore original finishes/lighting", "", "Clear bake")
+local polish = toolbar:CreateButton("WITB_Polish", "Add logistics scenery and neutral daylight without clearing your existing bake", "", "Polish facility")
+local clearPolish = toolbar:CreateButton("WITB_ClearFacility", "Remove only the added facility layer and restore its previous lighting", "", "Clear facility")
 local function operations()
 	local theme = RS:FindFirstChild("UITheme")
 	local config = RS:FindFirstChild("VisualConfig")
 	assert(theme and config, "Connect the current Rojo project first; UITheme/VisualConfig are missing.")
 	return require(script.VisualBake)(require(script.WarehouseVisualBuilder), require(script.WarehouseExteriorBuilder),
-		require(script.YardLayout), require(theme), require(config))
+		require(script.YardLayout), require(theme), require(config), require(script.FacilityPolish), require(script.FacilityLayout))
 end
 local function invoke(action)
 	local ok, success, message = pcall(function() return operations()[action]() end)
@@ -25,18 +27,190 @@ local function invoke(action)
 end
 bake.Click:Connect(function() invoke("Bake") end)
 clear.Click:Connect(function() invoke("Clear") end)
+polish.Click:Connect(function() invoke("Polish") end)
+clearPolish.Click:Connect(function() invoke("ClearPolish") end)
 ]]></string>
     </Properties>
     <Item class="ModuleScript" referent="1">
       <Properties>
+        <string name="Name">FacilityLayout</string>
+        <string name="Source"><![CDATA[-- Low-part-count logistics props. Positions are relative to the existing dock/estate
+-- origin; the four-column, 90 x 140 plot grid and truck route stay unchanged.
+local layout = {}
+local function plan()
+	local parts = {}
+	local function add(group, name, size, position, finish, options)
+		local value = {group = group, name = name, size = size, position = position, finish = finish}
+		for key, option in pairs(options or {}) do value[key] = option end
+		table.insert(parts, value)
+	end
+	return parts, add
+end
+local function pallet(add, group, x, z, stack)
+	-- Two runners and one deck suggest a pallet without dozens of individual boards.
+	for _, dx in ipairs({-1.2, 1.2}) do
+		add(group, "PalletRunner", {0.3, 0.35, 3}, {x + dx, 0.23, z}, "Wood")
+	end
+	add(group, "PalletDeck", {3.5, 0.16, 3}, {x, 0.49, z}, "Wood")
+	if stack then
+		add(group, "WrappedFreight", {3.2, 2.4, 2.8}, {x, 1.77, z}, "Freight")
+		for _, dx in ipairs({-0.95, 0.95}) do
+			add(group, "FreightStrap", {0.1, 2.42, 2.82}, {x + dx, 1.77, z}, "Steel")
+		end
+	end
+end
+local function container(add, group, x, z)
+	add(group, "ShippingContainer", {9, 7, 20}, {x, 3.56, z}, "Container")
+	for _, dx in ipairs({-2.2, 2.2}) do
+		add(group, "FreightDoor", {4.3, 6.5, 0.1}, {x + dx, 3.56, z - 10.06}, "SteelBlue")
+		add(group, "DoorBar", {0.1, 5.8, 0.15}, {x + dx, 3.56, z - 10.15}, "Steel")
+	end
+	for _, dz in ipairs({-8, -4, 0, 4, 8}) do
+		add(group, "ContainerRib", {0.1, 6.8, 0.14}, {x + 4.56, 3.56, z + dz}, "Steel")
+	end
+end
+local function building(add, group, x, z, width, depth, height, number)
+	add(group, "IndustrialShell", {width, height, depth}, {x, height / 2 + 0.06, z}, "Facade")
+	add(group, "RoofCap", {width + 1.2, 0.7, depth + 1.2}, {x, height + 0.41, z}, "Steel")
+	add(group, "Clerestory", {width - 5, 2, 0.1}, {x, height - 4, z - depth / 2 - 0.06}, "Glass")
+	add(group, "LoadingShutter", {10, 9, 0.12}, {x - width * 0.2, 4.6, z - depth / 2 - 0.08}, "SteelBlue")
+	add(group, "DepotLabel", {15, 2.4, 0.12}, {x + width * 0.2, 9, z - depth / 2 - 0.08}, "Steel",
+		{text = "FREIGHT DEPOT " .. number})
+	add(group, "RoofVent", {6, 2.5, 5}, {x + 8, height + 1.6, z + 4}, "Concrete")
+end
+function layout.PlotParts()
+	local parts, add = plan()
+	-- A parked, anchored van fits the left-hand parking bay; it is scenery, not a
+	-- second delivery vehicle. No scripts, constraints, sounds or lights inside it.
+	local x = -35
+	add("ParkedDeliveryVan", "Chassis", {5.6, 0.55, 11.6}, {x, 1.15, 0}, "Steel")
+	add("ParkedDeliveryVan", "CargoBody", {5.4, 3.8, 7.2}, {x, 3.15, 2}, "Vehicle")
+	add("ParkedDeliveryVan", "Cab", {5.3, 2.5, 3.7}, {x, 2.5, -3.5}, "Vehicle")
+	add("ParkedDeliveryVan", "Windshield", {4.5, 1.2, 0.06}, {x, 3.03, -5.39}, "Glass")
+	add("ParkedDeliveryVan", "FrontBumper", {5.7, 0.3, 0.3}, {x, 1.2, -5.85}, "Steel")
+	add("ParkedDeliveryVan", "RearBumper", {5.7, 0.3, 0.3}, {x, 1.2, 5.85}, "Steel")
+	for _, dx in ipairs({-2.65, 2.65}) do
+		for _, z in ipairs({-3.65, 3.7}) do
+			add("ParkedDeliveryVan", "Tyre", {0.65, 1.7, 1.7}, {x + dx, 0.91, z}, "Rubber", {shape = "Cylinder"})
+		end
+	end
+	add("ParkedDeliveryVan", "FleetLabel", {0.08, 1.1, 4.5}, {x - 2.75, 3.4, 1.8}, "Steel",
+		{text = "WITB\nLOGISTICS", face = "Left"})
+	for _, dx in ipairs({-1.85, 1.85}) do
+		add("ParkedDeliveryVan", "Headlamp", {0.85, 0.45, 0.08}, {x + dx, 1.9, -5.41}, "VehicleLamp")
+	end
+	-- Waste collection on the outer left flank; returning freight behind the dock.
+	add("WasteStation", "Dumpster", {5, 3, 4}, {-35, 1.56, 47}, "Waste")
+	add("WasteStation", "DumpsterLid", {5.3, 0.2, 4.3}, {-35, 3.16, 47}, "Steel")
+	add("WasteStation", "RecyclingLabel", {2.7, 0.8, 0.1}, {-35, 2.1, 44.94}, "Steel", {text = "RECYCLE"})
+	pallet(add, "FreightStaging", 11, 64, true)
+	pallet(add, "FreightStaging", 16, 68, false)
+	-- Equipment is next to the existing utility cabinet, outside the side walkway.
+	add("UtilityPlant", "HVAC", {4, 3, 4}, {35.5, 1.56, 53}, "Concrete")
+	add("UtilityPlant", "VentGrille", {3.4, 2.2, 0.08}, {35.5, 1.7, 50.94}, "Steel")
+	for _, y in ipairs({1.1, 1.7, 2.3}) do
+		add("UtilityPlant", "VentSlat", {3.1, 0.12, 0.09}, {35.5, y, 50.85}, "SteelBlue")
+	end
+	return parts
+end
+function layout.RowParts(row)
+	local parts, rawAdd = plan()
+	local function add(group, name, size, position, finish, options)
+		rawAdd(group, name, size, {position[1], position[2], position[3] + row * 140}, finish, options)
+	end
+	for column = 0, 3 do
+		local x = column * 90
+		-- Kerbs stay off the 22-stud road and the 12-stud delivery approach. A front
+		-- pedestrian connection joins the existing six-stud warehouse-side walkway.
+		add("PedestrianLinks", "FrontSidewalk", {5, 0.08, 36}, {x + 29, 0.07, -15}, "Concrete")
+		add("PedestrianLinks", "SideCurb", {0.25, 0.3, 36}, {x + 32, 0.18, -15}, "Concrete")
+		add("PedestrianLinks", "ParkingCurb", {17, 0.3, 0.25}, {x - 33.5, 0.18, -32}, "Concrete")
+		-- Short open fence runs suggest the boundary, leaving rear exits/gaps clear.
+		for _, dx in ipairs({-31, 31}) do
+			local span = dx > 0 and 12 or 20 -- Keep the outside cross-row walk clear.
+			add("SecurityFence", "RearFencePanel", {span, 4.5, 0.12}, {x + dx, 2.31, 82}, "Fence", {transparency = 0.9})
+			for _, post in ipairs({-span / 2, span / 2}) do
+				add("SecurityFence", "FencePost", {0.15, 5, 0.15}, {x + dx + post, 2.56, 82}, "Steel")
+			end
+			add("SecurityFence", "FenceRail", {span, 0.12, 0.12}, {x + dx, 4.55, 82}, "Steel")
+			for _, offset in ipairs(span == 20 and {-5, 0, 5} or {0}) do
+				add("SecurityFence", "FenceWire", {0.06, 4.5, 0.06}, {x + dx + offset, 2.31, 82}, "Steel")
+			end
+		end
+	end
+	-- Site edges extend behind the warehouse, not across the road or visitor link.
+	for _, x in ipairs({-51, 322}) do
+		add("SecurityFence", "SideFencePanel", {0.12, 4.5, 96}, {x, 2.31, 23}, "Fence", {transparency = 0.9})
+		for _, z in ipairs({-25, 7, 39, 71}) do
+			add("SecurityFence", "FencePost", {0.15, 5, 0.15}, {x, 2.56, z}, "Steel")
+		end
+		add("SecurityFence", "FenceRail", {0.12, 0.12, 96}, {x, 4.55, 23}, "Steel")
+		for _, z in ipairs({-13, 3, 19, 35, 51}) do
+			add("SecurityFence", "FenceWire", {0.06, 4.5, 0.06}, {x, 2.31, z}, "Steel")
+		end
+	end
+	add("Wayfinding", "SignPost", {0.18, 5.5, 0.18}, {-58, 2.81, -42}, "Steel")
+	add("Wayfinding", "DirectionSign", {9, 2.5, 0.12}, {-58, 4.75, -42}, "Steel",
+		{text = "LOADING BAYS  →\nVISITOR WALKWAYS  →"})
+	-- Repeated warehouses beyond the perimeter form an industrial skyline. Their
+	-- bounds stay outside *every* player column and future road row.
+	building(add, "WestFreightDepot", -115, 26, 70, 54, 19, "A")
+	building(add, "EastWorkshop", 395, 35, 88, 62, 24, "B")
+	container(add, "ContainerHolding", -72, 54)
+	pallet(add, "ContainerHolding", -72, 38, true)
+	return parts
+end
+return layout
+]]></string>
+      </Properties>
+    </Item>
+    <Item class="ModuleScript" referent="2">
+      <Properties>
+        <string name="Name">FacilityPolish</string>
+        <string name="Source"><![CDATA[-- Additive layer shared by the Studio toolbar and server. Saved groups are reused,
+-- including artist edits; the existing roads, template meshes and props are untouched.
+return function(config, layout, exterior)
+	local builder = {}
+	local function add(parent, descriptors, base, created)
+		if parent:FindFirstChild("FacilityPolish") then return end
+		local folder = Instance.new("Folder")
+		folder.Name = "FacilityPolish"
+		folder:SetAttribute("WITB_FacilityVersion", 1)
+		folder.Parent = parent
+		if created then created(folder) end -- Register before construction for failure cleanup.
+		exterior.BuildParts(descriptors, base, folder)
+	end
+	function builder.Decorate(plot, park, created)
+		if not config.WorldEnabled or config.YardEnabled == false or config.FacilityDetailsEnabled == false then return end
+		if not plot.Model.Parent or not park or park:GetAttribute("WITB_EstateVersion") ~= 1 then return end
+		local origin = park:GetAttribute("WITB_EstateOrigin")
+		if typeof(origin) ~= "Vector3" then return end
+		local marker = plot.Markers.TruckStop
+		local dock = marker.CFrame * CFrame.new(0, -marker.Size.Y / 2, 0)
+		add(plot.Runtime, layout.PlotParts(), dock, created)
+		for _, section in ipairs(park:GetChildren()) do
+			local row = section.Name:match("^EstateRow_(%d+)$")
+			if row and section:IsA("Folder") then
+				add(section, layout.RowParts(tonumber(row)), CFrame.new(origin), created)
+			end
+		end
+	end
+	return builder
+end
+]]></string>
+      </Properties>
+    </Item>
+    <Item class="ModuleScript" referent="3">
+      <Properties>
         <string name="Name">VisualBake</string>
         <string name="Source"><![CDATA[-- Editor-only operations. No DataStore, network calls or gameplay scripts are run.
-return function(visualFactory, exteriorFactory, layout, theme, config)
+return function(visualFactory, exteriorFactory, layout, theme, config, facilityFactory, facilityLayout)
 	local RunService = game:GetService("RunService")
 	local History = game:GetService("ChangeHistoryService")
 	local Lighting = game:GetService("Lighting")
 	local Storage = game:GetService("ServerStorage")
 	local backupName = "WITB_VisualBakeBackup"
+	local facilityBackupName = "WITB_FacilityBakeBackup"
 	local api = {}
 	local function ref(parent, name, target)
 		local value = Instance.new("ObjectValue")
@@ -70,7 +244,9 @@ return function(visualFactory, exteriorFactory, layout, theme, config)
 			end
 		end
 		local existing = {}
-		for _, value in ipairs(backup.ExistingLighting:GetChildren()) do existing[value.Value] = true end
+		for _, value in ipairs(backup.ExistingLighting:GetChildren()) do
+			if value.Value then existing[value.Value] = true end
+		end
 		for _, value in ipairs(Lighting:GetChildren()) do
 			if not existing[value] and value:GetAttribute("WITB_VisualEffect") == 1 then value:Destroy() end
 		end
@@ -79,6 +255,17 @@ return function(visualFactory, exteriorFactory, layout, theme, config)
 		end
 		Lighting:SetAttribute("WITB_VisualBakeVersion", backup:GetAttribute("PreviousLightingVersion"))
 		backup:Destroy()
+	end
+	local function newBackup(name)
+		local backup = Instance.new("Folder")
+		backup.Name = name; backup:SetAttribute("WITB_VisualBakeVersion", 1); backup.Parent = Storage
+		backup:SetAttribute("PreviousLightingVersion", Lighting:GetAttribute("WITB_VisualBakeVersion"))
+		local created = Instance.new("Folder"); created.Name = "Created"; created.Parent = backup
+		local existing = Instance.new("Folder"); existing.Name = "ExistingLighting"; existing.Parent = backup
+		for _, value in ipairs(Lighting:GetChildren()) do ref(existing, value.Name, value) end
+		capture(backup, Lighting, {"ClockTime", "Brightness", "Ambient", "OutdoorAmbient",
+			"ExposureCompensation", "EnvironmentDiffuseScale", "EnvironmentSpecularScale", "GlobalShadows", "ShadowSoftness"})
+		return backup
 	end
 	local function recording(name, work, rollback)
 		if RunService:IsRunning() then return false, "Stop Play before using WITB Art tools." end
@@ -111,14 +298,8 @@ return function(visualFactory, exteriorFactory, layout, theme, config)
 				local value = model:FindFirstChild(name, true)
 				assert(value and value:IsA("BasePart"), "Missing mesh: " .. name)
 			end
-			backup = Instance.new("Folder")
-			backup.Name = backupName; backup:SetAttribute("WITB_VisualBakeVersion", 1); backup.Parent = Storage
-			backup:SetAttribute("PreviousLightingVersion", Lighting:GetAttribute("WITB_VisualBakeVersion"))
-			local created = Instance.new("Folder"); created.Name = "Created"; created.Parent = backup
-			local existing = Instance.new("Folder"); existing.Name = "ExistingLighting"; existing.Parent = backup
-			for _, value in ipairs(Lighting:GetChildren()) do ref(existing, value.Name, value) end
-			capture(backup, Lighting, {"ClockTime", "Brightness", "Ambient", "OutdoorAmbient",
-				"ExposureCompensation", "EnvironmentDiffuseScale", "EnvironmentSpecularScale", "GlobalShadows", "ShadowSoftness"})
+			backup = newBackup(backupName)
+			local created = backup.Created
 			for _, value in ipairs(model:GetDescendants()) do
 				if value:IsA("BasePart") then capture(backup, value, {"Color", "Material"}) end
 			end
@@ -157,8 +338,62 @@ return function(visualFactory, exteriorFactory, layout, theme, config)
 		return recording("Clear", function()
 			local backup = Storage:FindFirstChild(backupName)
 			assert(backup, "No WITB bake backup found. Nothing was removed.")
+			local facilityBackup = Storage:FindFirstChild(facilityBackupName)
+			if facilityBackup then restore(facilityBackup) end
 			restore(backup)
 			return "Bake cleared; original finishes and lighting restored. Studio Undo restores your baked scene."
+		end)
+	end
+	function api.Polish()
+		local backup
+		return recording("Polish", function()
+			assert(config.WorldEnabled and config.YardEnabled ~= false and config.FacilityDetailsEnabled ~= false,
+				"Enable WorldEnabled, YardEnabled and FacilityDetailsEnabled before polishing.")
+			assert(facilityFactory and facilityLayout, "Install the current WITB Art plugin package first.")
+			assert(not Storage:FindFirstChild(facilityBackupName), "Facility already polished; existing edits retained.")
+			assert(Storage:FindFirstChild(backupName), "Use Bake visuals once before adding facility details.")
+			local model = workspace:FindFirstChild("WITB_StarterWarehousetest")
+			local decor = model and model:FindFirstChild("WITB_BakedDecor")
+			local park = workspace:FindFirstChild("IndustrialParkRuntime")
+			local markers = workspace:FindFirstChild("WarehouseMarkers")
+			assert(decor and decor:IsA("Folder") and decor:GetAttribute("WITB_VisualBakeVersion") == 1,
+				"Missing baked warehouse template; existing scene left intact.")
+			assert(park and park:IsA("Folder") and park:GetAttribute("WITB_EstateVersion") == 1
+				and typeof(park:GetAttribute("WITB_EstateOrigin")) == "Vector3", "Missing owned baked estate.")
+			assert(markers and markers:FindFirstChild("TruckStop") and markers.TruckStop:IsA("BasePart"), "Missing TruckStop marker.")
+			assert(not decor:FindFirstChild("FacilityPolish"), "Existing facility details left untouched.")
+			for _, section in ipairs(park:GetChildren()) do
+				if section.Name:match("^EstateRow_%d+$") then
+					assert(not section:FindFirstChild("FacilityPolish"), "Existing row facility details left untouched.")
+				end
+			end
+			backup = newBackup(facilityBackupName)
+			-- Only our generated lighting effects can be refined. Record their current
+			-- settings too, so Clear facility restores edits made since the original bake.
+			local properties = {
+				Atmosphere = {"Density", "Offset", "Color", "Decay", "Haze", "Glare"},
+				ColorCorrectionEffect = {"Brightness", "Contrast", "Saturation", "TintColor"},
+				BloomEffect = {"Intensity", "Size", "Threshold"},
+			}
+			for _, value in ipairs(Lighting:GetChildren()) do
+				if value:GetAttribute("WITB_VisualEffect") == 1 and properties[value.ClassName] then
+					capture(backup, value, properties[value.ClassName])
+				end
+			end
+			local exterior = exteriorFactory(config, layout)
+			local facility = facilityFactory(config, facilityLayout, exterior)
+			facility.Decorate({Model = model, Markers = markers, Runtime = decor, Slot = 1}, park,
+				function(folder) ref(backup.Created, folder.Name, folder) end)
+			visualFactory(theme, config).ApplyLighting(true)
+			return "Facility polished: new logistics details and neutral daylight. Existing scenery edits retained. Save the place."
+		end, function() if backup then restore(backup) end end)
+	end
+	function api.ClearPolish()
+		return recording("ClearFacility", function()
+			local backup = Storage:FindFirstChild(facilityBackupName)
+			assert(backup, "No facility backup found. Nothing was removed.")
+			restore(backup)
+			return "Facility layer cleared; previous lighting restored. Your original baked scene stays intact."
 		end)
 	end
 	return api
@@ -166,7 +401,7 @@ end
 ]]></string>
       </Properties>
     </Item>
-    <Item class="ModuleScript" referent="2">
+    <Item class="ModuleScript" referent="4">
       <Properties>
         <string name="Name">WarehouseExteriorBuilder</string>
         <string name="Source"><![CDATA[-- Shared art builder for the editor and server. No plot registry/save dependencies.
@@ -183,6 +418,15 @@ return function(config, layout)
 		Lamp = {Color3.fromRGB(227, 234, 244), Enum.Material.Neon},
 		Grass = {Color3.fromRGB(81, 98, 80), Enum.Material.Grass},
 		Foliage = {Color3.fromRGB(58, 83, 70), Enum.Material.Grass},
+		Wood = {Color3.fromRGB(132, 111, 82), Enum.Material.Wood},
+		Freight = {Color3.fromRGB(166, 155, 129), Enum.Material.SmoothPlastic},
+		Vehicle = {Color3.fromRGB(178, 178, 167), Enum.Material.Metal},
+		VehicleLamp = {Color3.fromRGB(224, 215, 184), Enum.Material.SmoothPlastic},
+		Glass = {Color3.fromRGB(44, 58, 65), Enum.Material.SmoothPlastic},
+		Rubber = {Color3.fromRGB(25, 28, 29), Enum.Material.SmoothPlastic},
+		Waste = {Color3.fromRGB(65, 81, 69), Enum.Material.Metal},
+		Facade = {Color3.fromRGB(126, 125, 114), Enum.Material.Concrete},
+		Fence = {Color3.fromRGB(115, 123, 119), Enum.Material.DiamondPlate},
 	}
 	local park, origin
 	local rows = {}
@@ -196,10 +440,12 @@ return function(config, layout)
 		value.Anchored = true; value.CanCollide = descriptor.collidable == true
 		value.CanTouch = false; value.CanQuery = descriptor.collidable == true
 		value.CastShadow = false; value.Parent = parent
+		value.Transparency = descriptor.transparency or 0
+		if descriptor.shape then value.Shape = Enum.PartType[descriptor.shape] end
 		if descriptor.name == "Shrub" then value.Shape = Enum.PartType.Ball end
 		if descriptor.text then
 			local sign = Instance.new("SurfaceGui")
-			sign.Face = Enum.NormalId.Front
+			sign.Face = descriptor.face and Enum.NormalId[descriptor.face] or Enum.NormalId.Front
 			sign.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud; sign.PixelsPerStud = 80
 			sign.MaxDistance = 85; sign.LightInfluence = 0.3; sign.Parent = value
 			local text = Instance.new("TextLabel")
@@ -214,6 +460,21 @@ return function(config, layout)
 			light.Parent = value
 		end
 		return value
+	end
+	function builder.BuildParts(descriptors, base, parent)
+		local groups = {}
+		for _, descriptor in ipairs(descriptors) do
+			local target = parent
+			if descriptor.group then
+				if not groups[descriptor.group] then
+					local model = Instance.new("Model")
+					model.Name = descriptor.group; model.Parent = parent
+					groups[descriptor.group] = model
+				end
+				target = groups[descriptor.group]
+			end
+			make(descriptor, base, target)
+		end
 	end
 	function builder.FinishBaseplate()
 		if config.BaseplateFinishEnabled == false then return end
@@ -312,7 +573,7 @@ end
 ]]></string>
       </Properties>
     </Item>
-    <Item class="ModuleScript" referent="3">
+    <Item class="ModuleScript" referent="5">
       <Properties>
         <string name="Name">WarehouseVisualBuilder</string>
         <string name="Source"><![CDATA[-- Shared art builder used by runtime and the Studio plugin. No gameplay dependencies.
@@ -320,12 +581,12 @@ local Lighting = game:GetService("Lighting")
 return function(theme, config)
 	local builder = {}
 	local bound = setmetatable({}, {__mode = "k"})
-	function builder.ApplyLighting()
+	function builder.ApplyLighting(refineExisting)
 		if config.LightingEnabled then
-			Lighting.ClockTime = 16.2
-			Lighting.Brightness = 2.5
-			Lighting.Ambient = Color3.fromRGB(91, 102, 118)
-			Lighting.OutdoorAmbient = Color3.fromRGB(116, 129, 145)
+			Lighting.ClockTime = 14.3
+			Lighting.Brightness = 2.1
+			Lighting.Ambient = Color3.fromRGB(105, 104, 100)
+			Lighting.OutdoorAmbient = Color3.fromRGB(125, 126, 122)
 			Lighting.ExposureCompensation = 0
 			Lighting.EnvironmentDiffuseScale = 0.8
 			Lighting.EnvironmentSpecularScale = 0.65
@@ -333,17 +594,24 @@ return function(theme, config)
 			Lighting.ShadowSoftness = 0.35
 			-- Respect an existing artist-authored effect rather than stack another of its class.
 			local function effect(class, name, properties)
-				if Lighting:FindFirstChildOfClass(class) then return end
+				local existing = Lighting:FindFirstChildOfClass(class)
+				if existing then
+					-- Update only our generated effects on an explicit editor polish.
+					if refineExisting and existing:GetAttribute("WITB_VisualEffect") == 1 and existing.Name == name then
+						for key, property in pairs(properties) do existing[key] = property end
+					end
+					return
+				end
 				local value = Instance.new(class)
 				value.Name = name
 				value:SetAttribute("WITB_VisualEffect", 1)
 				for key, property in pairs(properties) do value[key] = property end
 				value.Parent = Lighting
 			end
-			effect("Atmosphere", "WITB_Atmosphere", {Density = 0.18, Offset = 0.15,
-				Color = Color3.fromRGB(198, 211, 224), Decay = Color3.fromRGB(142, 153, 169), Haze = 0.6, Glare = 0})
+			effect("Atmosphere", "WITB_Atmosphere", {Density = 0.12, Offset = 0.15,
+				Color = Color3.fromRGB(208, 205, 195), Decay = Color3.fromRGB(153, 158, 159), Haze = 0.3, Glare = 0})
 			effect("ColorCorrectionEffect", "WITB_Grade", {Brightness = 0.01, Contrast = 0.06,
-				Saturation = -0.06, TintColor = Color3.fromRGB(247, 250, 255)})
+				Saturation = -0.03, TintColor = Color3.fromRGB(255, 251, 244)})
 			effect("BloomEffect", "WITB_Bloom", {Intensity = 0.12, Size = 18, Threshold = 1.8})
 		end
 	end
@@ -515,7 +783,7 @@ end
 ]]></string>
       </Properties>
     </Item>
-    <Item class="ModuleScript" referent="4">
+    <Item class="ModuleScript" referent="6">
       <Properties>
         <string name="Name">YardLayout</string>
         <string name="Source"><![CDATA[-- Pure placement plan in studs relative to TruckStop's bottom face.

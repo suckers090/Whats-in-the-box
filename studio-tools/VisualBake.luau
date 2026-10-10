@@ -1,10 +1,11 @@
 -- Editor-only operations. No DataStore, network calls or gameplay scripts are run.
-return function(visualFactory, exteriorFactory, layout, theme, config)
+return function(visualFactory, exteriorFactory, layout, theme, config, facilityFactory, facilityLayout)
 	local RunService = game:GetService("RunService")
 	local History = game:GetService("ChangeHistoryService")
 	local Lighting = game:GetService("Lighting")
 	local Storage = game:GetService("ServerStorage")
 	local backupName = "WITB_VisualBakeBackup"
+	local facilityBackupName = "WITB_FacilityBakeBackup"
 	local api = {}
 	local function ref(parent, name, target)
 		local value = Instance.new("ObjectValue")
@@ -38,7 +39,9 @@ return function(visualFactory, exteriorFactory, layout, theme, config)
 			end
 		end
 		local existing = {}
-		for _, value in ipairs(backup.ExistingLighting:GetChildren()) do existing[value.Value] = true end
+		for _, value in ipairs(backup.ExistingLighting:GetChildren()) do
+			if value.Value then existing[value.Value] = true end
+		end
 		for _, value in ipairs(Lighting:GetChildren()) do
 			if not existing[value] and value:GetAttribute("WITB_VisualEffect") == 1 then value:Destroy() end
 		end
@@ -47,6 +50,17 @@ return function(visualFactory, exteriorFactory, layout, theme, config)
 		end
 		Lighting:SetAttribute("WITB_VisualBakeVersion", backup:GetAttribute("PreviousLightingVersion"))
 		backup:Destroy()
+	end
+	local function newBackup(name)
+		local backup = Instance.new("Folder")
+		backup.Name = name; backup:SetAttribute("WITB_VisualBakeVersion", 1); backup.Parent = Storage
+		backup:SetAttribute("PreviousLightingVersion", Lighting:GetAttribute("WITB_VisualBakeVersion"))
+		local created = Instance.new("Folder"); created.Name = "Created"; created.Parent = backup
+		local existing = Instance.new("Folder"); existing.Name = "ExistingLighting"; existing.Parent = backup
+		for _, value in ipairs(Lighting:GetChildren()) do ref(existing, value.Name, value) end
+		capture(backup, Lighting, {"ClockTime", "Brightness", "Ambient", "OutdoorAmbient",
+			"ExposureCompensation", "EnvironmentDiffuseScale", "EnvironmentSpecularScale", "GlobalShadows", "ShadowSoftness"})
+		return backup
 	end
 	local function recording(name, work, rollback)
 		if RunService:IsRunning() then return false, "Stop Play before using WITB Art tools." end
@@ -79,14 +93,8 @@ return function(visualFactory, exteriorFactory, layout, theme, config)
 				local value = model:FindFirstChild(name, true)
 				assert(value and value:IsA("BasePart"), "Missing mesh: " .. name)
 			end
-			backup = Instance.new("Folder")
-			backup.Name = backupName; backup:SetAttribute("WITB_VisualBakeVersion", 1); backup.Parent = Storage
-			backup:SetAttribute("PreviousLightingVersion", Lighting:GetAttribute("WITB_VisualBakeVersion"))
-			local created = Instance.new("Folder"); created.Name = "Created"; created.Parent = backup
-			local existing = Instance.new("Folder"); existing.Name = "ExistingLighting"; existing.Parent = backup
-			for _, value in ipairs(Lighting:GetChildren()) do ref(existing, value.Name, value) end
-			capture(backup, Lighting, {"ClockTime", "Brightness", "Ambient", "OutdoorAmbient",
-				"ExposureCompensation", "EnvironmentDiffuseScale", "EnvironmentSpecularScale", "GlobalShadows", "ShadowSoftness"})
+			backup = newBackup(backupName)
+			local created = backup.Created
 			for _, value in ipairs(model:GetDescendants()) do
 				if value:IsA("BasePart") then capture(backup, value, {"Color", "Material"}) end
 			end
@@ -125,8 +133,62 @@ return function(visualFactory, exteriorFactory, layout, theme, config)
 		return recording("Clear", function()
 			local backup = Storage:FindFirstChild(backupName)
 			assert(backup, "No WITB bake backup found. Nothing was removed.")
+			local facilityBackup = Storage:FindFirstChild(facilityBackupName)
+			if facilityBackup then restore(facilityBackup) end
 			restore(backup)
 			return "Bake cleared; original finishes and lighting restored. Studio Undo restores your baked scene."
+		end)
+	end
+	function api.Polish()
+		local backup
+		return recording("Polish", function()
+			assert(config.WorldEnabled and config.YardEnabled ~= false and config.FacilityDetailsEnabled ~= false,
+				"Enable WorldEnabled, YardEnabled and FacilityDetailsEnabled before polishing.")
+			assert(facilityFactory and facilityLayout, "Install the current WITB Art plugin package first.")
+			assert(not Storage:FindFirstChild(facilityBackupName), "Facility already polished; existing edits retained.")
+			assert(Storage:FindFirstChild(backupName), "Use Bake visuals once before adding facility details.")
+			local model = workspace:FindFirstChild("WITB_StarterWarehousetest")
+			local decor = model and model:FindFirstChild("WITB_BakedDecor")
+			local park = workspace:FindFirstChild("IndustrialParkRuntime")
+			local markers = workspace:FindFirstChild("WarehouseMarkers")
+			assert(decor and decor:IsA("Folder") and decor:GetAttribute("WITB_VisualBakeVersion") == 1,
+				"Missing baked warehouse template; existing scene left intact.")
+			assert(park and park:IsA("Folder") and park:GetAttribute("WITB_EstateVersion") == 1
+				and typeof(park:GetAttribute("WITB_EstateOrigin")) == "Vector3", "Missing owned baked estate.")
+			assert(markers and markers:FindFirstChild("TruckStop") and markers.TruckStop:IsA("BasePart"), "Missing TruckStop marker.")
+			assert(not decor:FindFirstChild("FacilityPolish"), "Existing facility details left untouched.")
+			for _, section in ipairs(park:GetChildren()) do
+				if section.Name:match("^EstateRow_%d+$") then
+					assert(not section:FindFirstChild("FacilityPolish"), "Existing row facility details left untouched.")
+				end
+			end
+			backup = newBackup(facilityBackupName)
+			-- Only our generated lighting effects can be refined. Record their current
+			-- settings too, so Clear facility restores edits made since the original bake.
+			local properties = {
+				Atmosphere = {"Density", "Offset", "Color", "Decay", "Haze", "Glare"},
+				ColorCorrectionEffect = {"Brightness", "Contrast", "Saturation", "TintColor"},
+				BloomEffect = {"Intensity", "Size", "Threshold"},
+			}
+			for _, value in ipairs(Lighting:GetChildren()) do
+				if value:GetAttribute("WITB_VisualEffect") == 1 and properties[value.ClassName] then
+					capture(backup, value, properties[value.ClassName])
+				end
+			end
+			local exterior = exteriorFactory(config, layout)
+			local facility = facilityFactory(config, facilityLayout, exterior)
+			facility.Decorate({Model = model, Markers = markers, Runtime = decor, Slot = 1}, park,
+				function(folder) ref(backup.Created, folder.Name, folder) end)
+			visualFactory(theme, config).ApplyLighting(true)
+			return "Facility polished: new logistics details and neutral daylight. Existing scenery edits retained. Save the place."
+		end, function() if backup then restore(backup) end end)
+	end
+	function api.ClearPolish()
+		return recording("ClearFacility", function()
+			local backup = Storage:FindFirstChild(facilityBackupName)
+			assert(backup, "No facility backup found. Nothing was removed.")
+			restore(backup)
+			return "Facility layer cleared; previous lighting restored. Your original baked scene stays intact."
 		end)
 	end
 	return api

@@ -1,0 +1,23 @@
+{
+  "name": "WITB Visual Tools",
+  "tree": {
+    "$path": "studio-tools/VisualTools.plugin.luau",
+    "$ignoreUnknownInstances": true,
+    "$properties": {
+      "Disabled": false,
+      "RunContext": "Legacy"
+    },
+    "VisualBake": {
+      "$path": "studio-tools/VisualBake.luau"
+    },
+    "WarehouseVisualBuilder": {
+      "$path": "src/ServerScriptService/WarehouseVisualBuilder.luau"
+    },
+    "WarehouseExteriorBuilder": {
+      "$path": "src/ServerScriptService/WarehouseExteriorBuilder.luau"
+    },
+    "YardLayout": {
+      "$path": "src/ServerScriptService/YardLayout.luau"
+    }
+  }
+}

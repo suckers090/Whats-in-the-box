@@ -2,6 +2,10 @@
 
 Existing Roblox warehouse mystery-package game.
 
+The [logistics facility polish](docs/FACILITY_POLISH.md) adds parked vans, freight
+staging, waste/utilities, sidewalks, fencing and distant depots with neutral daylight.
+Use the additive Polish facility toolbar action to retain your existing baked edits.
+
 The [Studio bake tool](docs/EDITOR_BAKE.md) makes the existing industrial scenery
 editable before Play, with backups, Clear and Studio Undo. Runtime plots reuse the
 baked warehouse dressing and shared yard; player data and gameplay stay intact.
