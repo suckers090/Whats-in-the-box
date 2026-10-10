@@ -1,5 +1,8 @@
 # Industrial yard and exterior finishes
 
+The optional [Studio bake tool](EDITOR_BAKE.md) now saves this scenery for editing
+before Play. The runtime-only behavior below still applies when you have not baked.
+
 This stage addresses the blank grid baseplate and pale imported structural parts.
 The reference export was inspected first: the roof, canopy, trims, frames, doors,
 columns and dock are neutral MeshParts without TextureIDs. Stone walls and custom

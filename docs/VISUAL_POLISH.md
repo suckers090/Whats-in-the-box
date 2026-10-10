@@ -1,5 +1,8 @@
 # Industrial visual polish
 
+The optional [Studio bake tool](EDITOR_BAKE.md) now saves the world dressing and
+lighting for editing before Play. Without a bake, the runtime behavior below applies.
+
 Audit baseline: 6456500. The current warehouse export has a named floor, roof,
 canopy, door frames and exterior light housings. Its interior is mostly empty and
 has no Sound instances. Existing presentation includes a rotating item viewport,

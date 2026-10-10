@@ -19,12 +19,16 @@ Enum.Material.Asphalt='Asphalt'; Enum.Material.Grass='Grass'
 Enum.PartType={Ball='Ball'}
 local vectorMT={__sub=function(a,b) return Vector3.new(a.X-b.X,a.Y-b.Y,a.Z-b.Z) end}
 Vector3.new=function(x,y,z) return setmetatable(triple(x,y,z),vectorMT) end
+local typeof=function(value)
+ if type(value)=='table' and getmetatable(value)==vectorMT then return 'Vector3' end
+ return type(value)
+end
 frameMT.__index=function(self,key) if key=='Position' then return Vector3.new(self.X,self.Y,self.Z) end end
 CFrame.new=function(x,y,z)
  if type(x)=='table' then return setmetatable(triple(x.X,x.Y,x.Z),frameMT) end
  return setmetatable(triple(x or 0,y or 0,z or 0),frameMT)
 end
-function methods:GetChildren() return self.children end
+function methods:GetChildren() return table.clone(self.children) end
 function methods:GetDescendants()
  local list={}
  local function walk(value)
@@ -69,6 +73,8 @@ local registry={GetAll=function() return {plot} end,Added={Connect=function(_,fn
 local function run()
 '''
 source = (root / 'src/ServerScriptService/WarehouseExterior.server.luau').read_text()
+source = source.replace('require(script.Parent:WaitForChild("WarehouseExteriorBuilder"))', 'loadExteriorBuilder()')
+source = 'local function loadExteriorBuilder()\n' + (root / 'src/ServerScriptService/WarehouseExteriorBuilder.luau').read_text() + '\nend\n' + source
 source = source.replace('require(RS:WaitForChild("VisualConfig"))', 'config')
 source = source.replace('require(script.Parent:WaitForChild("PlotRegistry"))', 'registry')
 source = source.replace('require(script.Parent:WaitForChild("YardLayout"))', 'layout')
@@ -108,7 +114,12 @@ for _,value in ipairs(park:GetDescendants()) do
  elseif value.ClassName=='PointLight' then lights+=1; assert(value.Shadows==false) end
 end
 assert(lights==8,'Four streetlights per shared row')
-count=#all; config.WorldEnabled=false; run(); assert(#all==count)
+local edited=section:FindFirstChild('RoadCenterDash'); edited.Color='ArtistPaint'
+count=#all
+run()
+assert(#all==count and edited.Color=='ArtistPaint','Fresh runtime must reuse saved roads and preserve edits')
+local indicatorCount=#all
+config.WorldEnabled=false; run(); assert(#all==indicatorCount)
 print('PASS: actual exterior setup, arbitrary snapshot order, shared rows/idempotence, imported asset/physics preservation and toggles')
 '''
 with tempfile.TemporaryDirectory() as directory:

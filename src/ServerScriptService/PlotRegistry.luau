@@ -58,6 +58,13 @@ function registry.Assign(player, scannerUnlocked)
 	local runtime = Instance.new("Folder")
 	runtime.Name = "WarehousePrototype"
 	runtime.Parent = building
+	-- Baked art is already shifted by PivotTo. Reuse it inside the normal runtime
+	-- folder, preserving edits and avoiding a second set of fixtures/yard props.
+	local baked = building:FindFirstChild("WITB_BakedDecor")
+	if baked and baked:IsA("Folder") and baked:GetAttribute("WITB_VisualBakeVersion") == 1 then
+		for _, child in ipairs(baked:GetChildren()) do child.Parent = runtime end
+		baked:Destroy()
+	end
 	local packages = Instance.new("Folder")
 	packages.Name = "Packages"
 	packages.Parent = runtime

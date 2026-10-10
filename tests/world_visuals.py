@@ -27,6 +27,8 @@ for item in place.iter('Item'):
     dimensions = [float(size.find(k).text) for k in ('X', 'Y', 'Z')]
     fixtures.append((name.text, xyz, dimensions))
 source = (root / 'src/ServerScriptService/WarehouseVisuals.server.luau').read_text()
+source = source.replace('require(script.Parent:WaitForChild("WarehouseVisualBuilder"))', 'loadVisualBuilder()')
+source = 'local function loadVisualBuilder()\n' + (root / 'src/ServerScriptService/WarehouseVisualBuilder.luau').read_text() + '\nend\n' + source
 source = source.replace('require(RS:WaitForChild("UITheme"))', 'theme')
 source = source.replace('require(RS:WaitForChild("VisualConfig"))', 'config')
 source = source.replace('require(script.Parent:WaitForChild("PlotRegistry"))', 'registry')
@@ -43,8 +45,23 @@ local Enum = {Material={Metal='Metal',Neon='Neon',Wood='Wood',SmoothPlastic='Smo
  NormalId={Front='Front',Top='Top'},Font={GothamBold='GothamBold'}}
 local all = {}
 local methods = {}
-local function signal() return {Connect=function() return {Disconnect=function() end} end} end
-function methods:IsA(name) return name == self.ClassName or (name=='BasePart' and (self.ClassName=='Part' or self.ClassName=='MeshPart')) end
+local function signal()
+ local value={callbacks={}}
+ function value:Connect(callback)
+  local entry={callback=callback,connected=true}; table.insert(self.callbacks,entry)
+  return {Disconnect=function() entry.connected=false end}
+ end
+ function value:Once(callback)
+  local connection
+  connection=self:Connect(function(...) connection:Disconnect(); callback(...) end)
+  return connection
+ end
+ function value:Fire(...)
+  for _,entry in ipairs(table.clone(self.callbacks)) do if entry.connected then entry.callback(...) end end
+ end
+ return value
+end
+function methods:IsA(name) return name == self.ClassName or (name=='BasePart' and (self.ClassName=='Part' or self.ClassName=='MeshPart' or self.ClassName=='SpawnLocation')) end
 function methods:FindFirstChild(name,recursive)
  for _,child in ipairs(self.children) do
   if child.Name==name then return child end
@@ -55,14 +72,34 @@ function methods:FindFirstChildOfClass(class)
  for _,child in ipairs(self.children) do if child.ClassName==class then return child end end
 end
 function methods:WaitForChild(name) return self:FindFirstChild(name) end
+function methods:GetChildren() return table.clone(self.children) end
+function methods:GetAttributes() return table.clone(self.attributes) end
 function methods:GetAttribute(name) return self.attributes[name] end
-function methods:GetAttributeChangedSignal() return signal() end
-local mt = {__index=methods,__newindex=function(self,key,value)
- if key=='Parent' then rawset(self,key,value); if value then table.insert(value.children,self) end
+function methods:SetAttribute(name,value)
+ self.attributes[name]=value
+ if self.signals[name] then self.signals[name]:Fire() end
+end
+function methods:GetAttributeChangedSignal(name)
+ if not self.signals[name] then self.signals[name]=signal() end
+ return self.signals[name]
+end
+function methods:Destroy()
+ self.Destroying:Fire()
+ for _,child in ipairs(table.clone(self.children)) do child:Destroy() end
+ self.Parent=nil
+end
+local mt = {__index=function(self,key)
+ if key=='Parent' then return rawget(self,'_parent') end
+ return methods[key] or methods.FindFirstChild(self,key)
+end,__newindex=function(self,key,value)
+ if key=='Parent' then
+  local old=rawget(self,'_parent')
+  if old then for index,child in ipairs(old.children) do if child==self then table.remove(old.children,index); break end end end
+  rawset(self,'_parent',value); if value then table.insert(value.children,self) end
  else rawset(self,key,value) end
 end}
 local Instance = {new=function(class)
- local value=setmetatable({ClassName=class,children={},attributes={}},mt)
+ local value=setmetatable({ClassName=class,children={},attributes={},signals={},Destroying=signal()},mt)
  table.insert(all,value); return value
 end}
 local function node(class,name,parent)

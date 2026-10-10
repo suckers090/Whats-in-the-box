@@ -81,6 +81,14 @@
           "Disabled": false,
           "RunContext": "Legacy"
         }
+      },
+      "WarehouseVisualBuilder": {
+        "$path": "src/ServerScriptService/WarehouseVisualBuilder.luau",
+        "$ignoreUnknownInstances": true
+      },
+      "WarehouseExteriorBuilder": {
+        "$path": "src/ServerScriptService/WarehouseExteriorBuilder.luau",
+        "$ignoreUnknownInstances": true
       }
     },
     "StarterPlayer": {
@@ -153,6 +161,30 @@
       "RevealStyle": {
         "$path": "src/ReplicatedStorage/RevealStyle.luau",
         "$ignoreUnknownInstances": true
+      }
+    },
+    "ServerStorage": {
+      "$className": "ServerStorage",
+      "$ignoreUnknownInstances": true,
+      "WITBVisualTools": {
+        "$path": "studio-tools/VisualTools.plugin.luau",
+        "$ignoreUnknownInstances": true,
+        "$properties": {
+          "Disabled": false,
+          "RunContext": "Legacy"
+        },
+        "VisualBake": {
+          "$path": "studio-tools/VisualBake.luau"
+        },
+        "WarehouseVisualBuilder": {
+          "$path": "src/ServerScriptService/WarehouseVisualBuilder.luau"
+        },
+        "WarehouseExteriorBuilder": {
+          "$path": "src/ServerScriptService/WarehouseExteriorBuilder.luau"
+        },
+        "YardLayout": {
+          "$path": "src/ServerScriptService/YardLayout.luau"
+        }
       }
     }
   }

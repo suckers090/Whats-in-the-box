@@ -2,6 +2,10 @@
 
 Existing Roblox warehouse mystery-package game.
 
+The [Studio bake tool](docs/EDITOR_BAKE.md) makes the existing industrial scenery
+editable before Play, with backups, Clear and Studio Undo. Runtime plots reuse the
+baked warehouse dressing and shared yard; player data and gameplay stay intact.
+
 The [industrial yard update](docs/INDUSTRIAL_YARD.md) adds shared streets, lot
 markings, landscaping and matching exterior finishes. It needs only two new
 server files plus the updated Rojo mapping; existing save settings stay intact.

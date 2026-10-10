@@ -1,0 +1,603 @@
+<roblox version="4">
+  <Item class="Script" referent="0">
+    <Properties>
+      <string name="Name">WITB Visual Tools</string>
+      <bool name="Disabled">false</bool>
+      <token name="RunContext">0</token>
+      <string name="Source"><![CDATA[-- Dormant in ServerStorage; runs only after installation as a local Studio plugin.
+if not plugin then return end
+local RS = game:GetService("ReplicatedStorage")
+local toolbar = plugin:CreateToolbar("WITB Art")
+local bake = toolbar:CreateButton("WITB_Bake", "Generate editable scenery and preserve original art with Undo", "", "Bake visuals")
+local clear = toolbar:CreateButton("WITB_Clear", "Remove generated scenery and restore original finishes/lighting", "", "Clear bake")
+local function operations()
+	local theme = RS:FindFirstChild("UITheme")
+	local config = RS:FindFirstChild("VisualConfig")
+	assert(theme and config, "Connect the current Rojo project first; UITheme/VisualConfig are missing.")
+	return require(script.VisualBake)(require(script.WarehouseVisualBuilder), require(script.WarehouseExteriorBuilder),
+		require(script.YardLayout), require(theme), require(config))
+end
+local function invoke(action)
+	local ok, success, message = pcall(function() return operations()[action]() end)
+	if not ok then warn("WITB Art: " .. tostring(success))
+	elseif not success then warn("WITB Art: " .. tostring(message))
+	else print("WITB Art: " .. tostring(message)) end
+end
+bake.Click:Connect(function() invoke("Bake") end)
+clear.Click:Connect(function() invoke("Clear") end)
+]]></string>
+    </Properties>
+    <Item class="ModuleScript" referent="1">
+      <Properties>
+        <string name="Name">VisualBake</string>
+        <string name="Source"><![CDATA[-- Editor-only operations. No DataStore, network calls or gameplay scripts are run.
+return function(visualFactory, exteriorFactory, layout, theme, config)
+	local RunService = game:GetService("RunService")
+	local History = game:GetService("ChangeHistoryService")
+	local Lighting = game:GetService("Lighting")
+	local Storage = game:GetService("ServerStorage")
+	local backupName = "WITB_VisualBakeBackup"
+	local api = {}
+	local function ref(parent, name, target)
+		local value = Instance.new("ObjectValue")
+		value.Name = name; value.Value = target; value.Parent = parent
+	end
+	local function capture(backup, target, properties)
+		local entry = Instance.new("Folder")
+		entry.Name = "Original_" .. target.Name
+		entry.Parent = backup
+		ref(entry, "Target", target)
+		for _, property in ipairs(properties) do
+			local value = target[property]
+			if typeof(value) == "EnumItem" then
+				entry:SetAttribute(property, value.Name)
+				entry:SetAttribute("_Enum_" .. property, true)
+			else entry:SetAttribute(property, value) end
+		end
+	end
+	local function restore(backup)
+		assert(backup:GetAttribute("WITB_VisualBakeVersion") == 1, "Unsupported visual backup; left untouched")
+		for _, entry in ipairs(backup:GetChildren()) do
+			local targetRef = entry:IsA("Folder") and entry:FindFirstChild("Target")
+			local target = targetRef and targetRef.Value
+			if target and (target.Parent or target == Lighting) then
+				for property, value in pairs(entry:GetAttributes()) do
+					if property:sub(1, 1) ~= "_" then
+						if entry:GetAttribute("_Enum_" .. property) then value = Enum.Material[value] end
+						target[property] = value
+					end
+				end
+			end
+		end
+		local existing = {}
+		for _, value in ipairs(backup.ExistingLighting:GetChildren()) do existing[value.Value] = true end
+		for _, value in ipairs(Lighting:GetChildren()) do
+			if not existing[value] and value:GetAttribute("WITB_VisualEffect") == 1 then value:Destroy() end
+		end
+		for _, value in ipairs(backup.Created:GetChildren()) do
+			if value.Value then value.Value:Destroy() end
+		end
+		Lighting:SetAttribute("WITB_VisualBakeVersion", backup:GetAttribute("PreviousLightingVersion"))
+		backup:Destroy()
+	end
+	local function recording(name, work, rollback)
+		if RunService:IsRunning() then return false, "Stop Play before using WITB Art tools." end
+		local id = History:TryBeginRecording("WITB_" .. name, name .. " WITB visuals")
+		if not id then return false, "Studio is busy recording another edit; try again when it finishes." end
+		local ok, message = pcall(work)
+		if not ok and rollback then
+			local restored, reason = pcall(rollback)
+			if not restored then warn("WITB Art rollback: " .. tostring(reason)) end
+		end
+		History:FinishRecording(id, ok and Enum.FinishRecordingOperation.Commit or Enum.FinishRecordingOperation.Cancel)
+		return ok, ok and message or tostring(message)
+	end
+	function api.Bake()
+		local backup
+		return recording("Bake", function()
+			assert(config.WorldEnabled, "Enable WorldEnabled in VisualConfig before baking.")
+			assert(not Storage:FindFirstChild(backupName), "Visuals are already baked. Edits retained; use Clear bake before regenerating.")
+			assert(not workspace:FindFirstChild("IndustrialParkRuntime"), "Existing IndustrialParkRuntime left untouched; use Clear bake for a previous bake.")
+			local model = workspace:FindFirstChild("WITB_StarterWarehousetest")
+			local markers = workspace:FindFirstChild("WarehouseMarkers")
+			assert(model and model:IsA("Model"), "Missing WITB_StarterWarehousetest model in Workspace.")
+			assert(markers and markers:IsA("Folder"), "Missing WarehouseMarkers folder in Workspace.")
+			assert(not model:FindFirstChild("WITB_BakedDecor"), "Existing WITB_BakedDecor left untouched.")
+			for _, name in ipairs({"PackageDrop", "ScannerLocation", "TruckStop"}) do
+				local value = markers:FindFirstChild(name)
+				assert(value and value:IsA("BasePart"), "Missing marker: " .. name)
+			end
+			for _, name in ipairs({"WareHouse_Floor", "Warehouse_Roof"}) do
+				local value = model:FindFirstChild(name, true)
+				assert(value and value:IsA("BasePart"), "Missing mesh: " .. name)
+			end
+			backup = Instance.new("Folder")
+			backup.Name = backupName; backup:SetAttribute("WITB_VisualBakeVersion", 1); backup.Parent = Storage
+			backup:SetAttribute("PreviousLightingVersion", Lighting:GetAttribute("WITB_VisualBakeVersion"))
+			local created = Instance.new("Folder"); created.Name = "Created"; created.Parent = backup
+			local existing = Instance.new("Folder"); existing.Name = "ExistingLighting"; existing.Parent = backup
+			for _, value in ipairs(Lighting:GetChildren()) do ref(existing, value.Name, value) end
+			capture(backup, Lighting, {"ClockTime", "Brightness", "Ambient", "OutdoorAmbient",
+				"ExposureCompensation", "EnvironmentDiffuseScale", "EnvironmentSpecularScale", "GlobalShadows", "ShadowSoftness"})
+			for _, value in ipairs(model:GetDescendants()) do
+				if value:IsA("BasePart") then capture(backup, value, {"Color", "Material"}) end
+			end
+			for _, name in ipairs({"Baseplate", "SpawnLocation"}) do
+				local value = workspace:FindFirstChild(name)
+				if value and value:IsA("BasePart") then
+					capture(backup, value, {"Color", "Material", "Transparency"})
+					for _, child in ipairs(value:GetChildren()) do
+						if child:IsA("Texture") or child:IsA("Decal") then capture(backup, child, {"Transparency"}) end
+					end
+				end
+			end
+			local decor = Instance.new("Folder")
+			decor.Name = "WITB_BakedDecor"; decor:SetAttribute("WITB_VisualBakeVersion", 1); decor.Parent = model
+			ref(created, "TemplateDecor", decor)
+			local plot = {Model = model, Markers = markers, Runtime = decor, Slot = 1}
+			local visual = visualFactory(theme, config)
+			local exterior = exteriorFactory(config, layout)
+			if config.YardEnabled ~= false then
+				local marker = markers.TruckStop
+				local origin = (marker.CFrame * CFrame.new(0, -marker.Size.Y / 2, 0)).Position
+				local park = Instance.new("Folder")
+				park.Name = "IndustrialParkRuntime"; park:SetAttribute("WITB_EstateVersion", 1)
+				park:SetAttribute("WITB_EstateOrigin", origin); park.Parent = workspace
+				ref(created, "Estate", park)
+				exterior.FinishBaseplate()
+			end
+			visual.ApplyLighting()
+			visual.Decorate(plot, false)
+			exterior.Decorate(plot)
+			Lighting:SetAttribute("WITB_VisualBakeVersion", 1)
+			return "Visuals baked. Edit the scenery, then save your place. Clear bake or Studio Undo restores the original art."
+		end, function() if backup then restore(backup) end end)
+	end
+	function api.Clear()
+		return recording("Clear", function()
+			local backup = Storage:FindFirstChild(backupName)
+			assert(backup, "No WITB bake backup found. Nothing was removed.")
+			restore(backup)
+			return "Bake cleared; original finishes and lighting restored. Studio Undo restores your baked scene."
+		end)
+	end
+	return api
+end
+]]></string>
+      </Properties>
+    </Item>
+    <Item class="ModuleScript" referent="2">
+      <Properties>
+        <string name="Name">WarehouseExteriorBuilder</string>
+        <string name="Source"><![CDATA[-- Shared art builder for the editor and server. No plot registry/save dependencies.
+return function(config, layout)
+	local builder = {}
+	local palette = {
+		Asphalt = {Color3.fromRGB(46, 52, 60), Enum.Material.Asphalt},
+		Road = {Color3.fromRGB(33, 39, 47), Enum.Material.Asphalt},
+		Concrete = {Color3.fromRGB(101, 110, 119), Enum.Material.Concrete},
+		Steel = {Color3.fromRGB(49, 62, 77), Enum.Material.Metal},
+		SteelBlue = {Color3.fromRGB(88, 116, 140), Enum.Material.Metal},
+		Paint = {Color3.fromRGB(210, 194, 137), Enum.Material.SmoothPlastic},
+		Container = {Color3.fromRGB(57, 83, 91), Enum.Material.Metal},
+		Lamp = {Color3.fromRGB(227, 234, 244), Enum.Material.Neon},
+		Grass = {Color3.fromRGB(81, 98, 80), Enum.Material.Grass},
+		Foliage = {Color3.fromRGB(58, 83, 70), Enum.Material.Grass},
+	}
+	local park, origin
+	local rows = {}
+	local function make(descriptor, base, parent)
+		local finish = palette[descriptor.finish]
+		local value = Instance.new("Part")
+		value.Name = descriptor.name
+		value.Size = Vector3.new(table.unpack(descriptor.size))
+		value.CFrame = base * CFrame.new(table.unpack(descriptor.position))
+		value.Color = finish[1]; value.Material = finish[2]
+		value.Anchored = true; value.CanCollide = descriptor.collidable == true
+		value.CanTouch = false; value.CanQuery = descriptor.collidable == true
+		value.CastShadow = false; value.Parent = parent
+		if descriptor.name == "Shrub" then value.Shape = Enum.PartType.Ball end
+		if descriptor.text then
+			local sign = Instance.new("SurfaceGui")
+			sign.Face = Enum.NormalId.Front
+			sign.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud; sign.PixelsPerStud = 80
+			sign.MaxDistance = 85; sign.LightInfluence = 0.3; sign.Parent = value
+			local text = Instance.new("TextLabel")
+			text.Size = UDim2.fromScale(0.9, 0.86); text.Position = UDim2.fromScale(0.05, 0.07)
+			text.BackgroundTransparency = 1; text.TextScaled = true
+			text.Font = Enum.Font.GothamBold; text.TextColor3 = Color3.fromRGB(223, 232, 242)
+			text.Text = descriptor.text; text.Parent = sign
+		end
+		if descriptor.name == "StreetLamp" then
+			local light = Instance.new("PointLight")
+			light.Color = finish[1]; light.Range = 24; light.Brightness = 0.8; light.Shadows = false
+			light.Parent = value
+		end
+		return value
+	end
+	function builder.FinishBaseplate()
+		if config.BaseplateFinishEnabled == false then return end
+		local plate = workspace:FindFirstChild("Baseplate")
+		if plate and plate:IsA("BasePart") then
+			plate.Color = palette.Grass[1]; plate.Material = palette.Grass[2]
+			-- Hide only the grid on the named baseplate; all warehouse textures stay.
+			for _, texture in ipairs(plate:GetChildren()) do
+				if texture:IsA("Texture") then texture.Transparency = 1 end
+			end
+		end
+		local spawn = workspace:FindFirstChild("SpawnLocation")
+		if spawn and spawn:IsA("SpawnLocation") then
+			-- PlotRegistry already gives each player an owner spawn. Hide the legacy visual.
+			spawn.Transparency = 1
+			for _, child in ipairs(spawn:GetChildren()) do
+				if child:IsA("Decal") or child:IsA("Texture") then child.Transparency = 1 end
+			end
+		end
+	end
+	local roofColor = Color3.fromRGB(39, 50, 65)
+	local frameColor = Color3.fromRGB(76, 98, 119)
+	local shutterColor = Color3.fromRGB(68, 84, 100)
+	function builder.Recolor(building)
+		if config.ExteriorColorsEnabled == false then return end
+		for _, value in ipairs(building:GetDescendants()) do
+			if not value:IsA("BasePart") then continue end
+			local name = value.Name
+			if name == "Warehouse_Roof" or name == "LoadingBay_Canopy" or name == "WareHouse_CompanySign" or name:match("^RoofTrim_") then
+				value.Color = roofColor; value.Material = Enum.Material.Metal
+			elseif name:match("^Column_") or name:match("^CanopySupport_")
+				or name:match("^DoorFrame_") or name:match("^EmployeeFrame_") or name:match("^EmployeeLight_Housing") then
+				value.Color = frameColor; value.Material = Enum.Material.Metal
+			elseif name == "GarageDoor_Panel" or name == "EmployeeDoor_panel" then
+				value.Color = shutterColor; value.Material = Enum.Material.Metal
+			elseif name:match("^GarageDoor_Slat") or name == "Dock_MetalEdge" or name == "Employee_DoorHandle" then
+				value.Color = frameColor; value.Material = Enum.Material.Metal
+			elseif name == "LoadingDock_Platform" then
+				value.Color = palette.Concrete[1]; value.Material = Enum.Material.Concrete
+			elseif name:match("^Dock_Bumper") then
+				value.Color = Color3.fromRGB(28, 32, 37); value.Material = Enum.Material.SmoothPlastic
+			end
+		end
+	end
+	function builder.Decorate(plot)
+		if not config.WorldEnabled or not plot.Model.Parent then return end
+		local existing = plot.Runtime:FindFirstChild("ExteriorPolish")
+		if existing then builder.EnsureEstate(plot); return end
+		local folder = Instance.new("Folder")
+		folder.Name = "ExteriorPolish"; folder.Parent = plot.Runtime
+		builder.Recolor(plot.Model)
+		if config.YardEnabled == false then return end
+		local marker = plot.Markers.TruckStop
+		local dock = marker.CFrame * CFrame.new(0, -marker.Size.Y / 2, 0)
+		builder.EnsureEstate(plot)
+		for _, descriptor in ipairs(layout.PlotParts()) do make(descriptor, dock, folder) end
+	end
+	function builder.EnsureEstate(plot)
+		if config.YardEnabled == false then return end
+		local marker = plot.Markers.TruckStop
+		local dock = marker.CFrame * CFrame.new(0, -marker.Size.Y / 2, 0)
+		local column, row = layout.Address(plot.Slot)
+		if not park then
+			local saved = workspace:FindFirstChild("IndustrialParkRuntime")
+			if saved then
+				if not saved:IsA("Folder") or saved:GetAttribute("WITB_EstateVersion") ~= 1 then
+					warn("WarehouseExterior: unmanaged IndustrialParkRuntime; leaving it untouched")
+					return
+				end
+				local location = saved:GetAttribute("WITB_EstateOrigin")
+				if typeof(location) ~= "Vector3" then warn("WarehouseExterior: invalid baked estate origin"); return end
+				park = saved; origin = CFrame.new(location)
+			else
+				local location = dock.Position - Vector3.new(column * 90, 0, row * 140)
+				origin = CFrame.new(location)
+				park = Instance.new("Folder"); park.Name = "IndustrialParkRuntime"
+				park:SetAttribute("WITB_EstateVersion", 1); park:SetAttribute("WITB_EstateOrigin", location)
+				park.Parent = workspace
+				builder.FinishBaseplate()
+			end
+		end
+		for index = 0, row do
+			if not rows[index] then
+				local section = park:FindFirstChild("EstateRow_" .. index)
+				if not section then
+					section = Instance.new("Folder"); section.Name = "EstateRow_" .. index; section.Parent = park
+					for _, descriptor in ipairs(layout.RowParts(index)) do make(descriptor, origin, section) end
+				end
+				rows[index] = section
+			end
+		end
+	end
+	function builder.GetEstate() return park end
+	return builder
+end
+]]></string>
+      </Properties>
+    </Item>
+    <Item class="ModuleScript" referent="3">
+      <Properties>
+        <string name="Name">WarehouseVisualBuilder</string>
+        <string name="Source"><![CDATA[-- Shared art builder used by runtime and the Studio plugin. No gameplay dependencies.
+local Lighting = game:GetService("Lighting")
+return function(theme, config)
+	local builder = {}
+	local bound = setmetatable({}, {__mode = "k"})
+	function builder.ApplyLighting()
+		if config.LightingEnabled then
+			Lighting.ClockTime = 16.2
+			Lighting.Brightness = 2.5
+			Lighting.Ambient = Color3.fromRGB(91, 102, 118)
+			Lighting.OutdoorAmbient = Color3.fromRGB(116, 129, 145)
+			Lighting.ExposureCompensation = 0
+			Lighting.EnvironmentDiffuseScale = 0.8
+			Lighting.EnvironmentSpecularScale = 0.65
+			Lighting.GlobalShadows = true
+			Lighting.ShadowSoftness = 0.35
+			-- Respect an existing artist-authored effect rather than stack another of its class.
+			local function effect(class, name, properties)
+				if Lighting:FindFirstChildOfClass(class) then return end
+				local value = Instance.new(class)
+				value.Name = name
+				value:SetAttribute("WITB_VisualEffect", 1)
+				for key, property in pairs(properties) do value[key] = property end
+				value.Parent = Lighting
+			end
+			effect("Atmosphere", "WITB_Atmosphere", {Density = 0.18, Offset = 0.15,
+				Color = Color3.fromRGB(198, 211, 224), Decay = Color3.fromRGB(142, 153, 169), Haze = 0.6, Glare = 0})
+			effect("ColorCorrectionEffect", "WITB_Grade", {Brightness = 0.01, Contrast = 0.06,
+				Saturation = -0.06, TintColor = Color3.fromRGB(247, 250, 255)})
+			effect("BloomEffect", "WITB_Bloom", {Intensity = 0.12, Size = 18, Threshold = 1.8})
+		end
+	end
+	local steel = Color3.fromRGB(54, 68, 82)
+	local caution = Color3.fromRGB(215, 174, 74)
+	local lampColor = Color3.fromRGB(224, 236, 248)
+
+	function builder.BindPlot(plot, folder, interactive)
+		local dockSign = folder:FindFirstChild("DockSign")
+		local gui = dockSign and dockSign:FindFirstChildOfClass("SurfaceGui")
+		local text = gui and gui:FindFirstChildOfClass("TextLabel")
+		if text then text.Text = string.format("BAY %02d  /  WITB", plot.Slot) end
+		if interactive == false then return end
+		for _, name in ipairs({"EmployeeDoor_panel", "GarageDoor_Panel"}) do
+			local door = plot.Model:FindFirstChild(name)
+			local indicator = folder:FindFirstChild("DoorStatus_" .. name)
+			if door and indicator and not bound[indicator] then
+				bound[indicator] = true
+				local function refresh()
+					indicator.Color = door:GetAttribute("DoorBusy") and caution
+						or (door:GetAttribute("DoorOpen") and theme.Success or theme.Accent)
+				end
+				local busy = door:GetAttributeChangedSignal("DoorBusy"):Connect(refresh)
+				local open = door:GetAttributeChangedSignal("DoorOpen"):Connect(refresh)
+				indicator.Destroying:Once(function() busy:Disconnect(); open:Disconnect(); bound[indicator] = nil end)
+				refresh()
+			end
+		end
+	end
+
+	function builder.Decorate(plot, interactive)
+		if not config.WorldEnabled or not plot.Model.Parent then return end
+		local existing = plot.Runtime:FindFirstChild("VisualPolish")
+		if existing then
+			builder.BindPlot(plot, existing, interactive)
+			return
+		end
+		local floor = plot.Model:FindFirstChild("WareHouse_Floor", true)
+		local roof = plot.Model:FindFirstChild("Warehouse_Roof", true)
+		if not floor or not floor:IsA("BasePart") or not roof or not roof:IsA("BasePart") then
+			warn("WarehouseVisuals: floor/roof missing; skipped props for " .. plot.Model.Name)
+			return
+		end
+		local folder = Instance.new("Folder")
+		folder.Name = "VisualPolish"
+		folder.Parent = plot.Runtime
+		local function part(name, size, frame, color, material)
+			local value = Instance.new("Part")
+			value.Name = name; value.Size = size; value.CFrame = frame
+			value.Color = color; value.Material = material or Enum.Material.Metal
+			value.Anchored = true; value.CanCollide = false; value.CanTouch = false; value.CanQuery = false
+			value.CastShadow = false
+			value.Parent = folder
+			return value
+		end
+		local function light(parent, range, brightness)
+			local value = Instance.new("PointLight")
+			value.Color = lampColor; value.Range = range; value.Brightness = brightness; value.Shadows = false
+			value.Parent = parent
+		end
+		local function label(parent, message, face, color)
+			local gui = Instance.new("SurfaceGui")
+			gui.Face = face or Enum.NormalId.Front
+			-- Uniform pixels per stud prevents square crates and thin floor signs
+			-- from stretching the same fixed 600x180 canvas into different shapes.
+			gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+			gui.PixelsPerStud = 80
+			gui.MaxDistance = 90; gui.LightInfluence = 0.3; gui.Parent = parent
+			local text = Instance.new("TextLabel")
+			text.Size = UDim2.fromScale(0.94, 0.88); text.Position = UDim2.fromScale(0.03, 0.06)
+			if gui.Face == Enum.NormalId.Top then
+				-- Top-face canvas X follows part Z; rotate the line along the strip's X.
+				text.AnchorPoint = Vector2.new(0.5, 0.5)
+				text.Position = UDim2.fromScale(0.5, 0.5)
+				text.Size = UDim2.fromOffset(parent.Size.X * 80 * 0.94, parent.Size.Z * 80 * 0.8)
+				text.Rotation = 90
+			end
+			text.BackgroundTransparency = 1; text.Text = message; text.TextColor3 = color or theme.Text
+			text.Font = Enum.Font.GothamBold; text.TextScaled = true; text.Parent = gui
+		end
+		local base = floor.CFrame * CFrame.new(0, floor.Size.Y / 2, 0)
+		local halfX, halfZ = floor.Size.X / 2, floor.Size.Z / 2
+		-- Large removable surface layers make the room cohesive without repainting
+		-- imported MeshParts/SurfaceAppearance assets or changing the collision floor.
+		-- Set SurfaceFinishEnabled=false in VisualConfig to keep the original textures.
+		if config.SurfaceFinishEnabled ~= false then
+			part("FloorFinish", Vector3.new(floor.Size.X - 0.5, 0.02, floor.Size.Z - 0.5),
+				base * CFrame.new(0, 0.008, 0), Color3.fromRGB(69, 79, 91), Enum.Material.Concrete)
+			for _, side in ipairs({-1, 1}) do
+				part("LowerWallPanel", Vector3.new(0.06, 5.2, floor.Size.Z - 1),
+					base * CFrame.new(side * (halfX - 0.5), 2.8, 0), steel)
+				part("WallCapRail", Vector3.new(0.12, 0.12, floor.Size.Z - 1),
+					base * CFrame.new(side * (halfX - 0.45), 5.45, 0), theme.Accent)
+			end
+			part("LowerBackPanel", Vector3.new(floor.Size.X - 1, 5.2, 0.06),
+				base * CFrame.new(0, 2.8, halfZ - 0.5), steel)
+			part("BackCapRail", Vector3.new(floor.Size.X - 1, 0.12, 0.12),
+				base * CFrame.new(0, 5.45, halfZ - 0.45), theme.Accent)
+		end
+		-- A central route stays clear. Shelves sit at the rear sides, away from all stations.
+		if halfX >= 18 and halfZ >= 16 then
+			for _, side in ipairs({-1, 1}) do
+				local rack = base * CFrame.new(side * (halfX - 5), 0, halfZ - 5)
+				for _, x in ipairs({-3.1, 3.1}) do
+					for _, z in ipairs({-1.4, 1.4}) do
+						part("RackUpright", Vector3.new(0.18, 7, 0.18), rack * CFrame.new(x, 3.5, z), steel)
+					end
+				end
+				for _, y in ipairs({0.3, 3.1, 6}) do
+					part("RackShelf", Vector3.new(6.6, 0.16, 3.2), rack * CFrame.new(0, y, 0), steel)
+					for _, x in ipairs({-1.6, 1.6}) do
+						local crate = part("StorageCrate", Vector3.new(2.5, 1.8, 2.2),
+							rack * CFrame.new(x, y + 0.98, 0), Color3.fromRGB(113, 96, 76), Enum.Material.Wood)
+						label(crate, "WITB\nSTORAGE", Enum.NormalId.Front, Color3.fromRGB(223, 216, 194))
+					end
+				end
+			end
+		end
+		-- Four ceiling fixtures. Read roof underside, not the model pivot or door pose.
+		for _, x in ipairs({-floor.Size.X * 0.24, floor.Size.X * 0.24}) do
+			for _, z in ipairs({-floor.Size.Z * 0.22, floor.Size.Z * 0.22}) do
+				local frame = roof.CFrame * CFrame.new(x, -roof.Size.Y / 2 - 0.3, z)
+				part("CeilingHousing", Vector3.new(5, 0.35, 1.1), frame, steel)
+				local panel = part("CeilingDiffuser", Vector3.new(4.6, 0.06, 0.8), frame * CFrame.new(0, -0.2, 0), lampColor, Enum.Material.Neon)
+				light(panel, 28, 1.5)
+			end
+		end
+		-- Add light emitters at existing exterior fixtures without repainting the mesh.
+		for _, name in ipairs({"EmployeeLight_Panel", "EmployeeLight_Panel.001"}) do
+			local existing = plot.Model:FindFirstChild(name, true)
+			if existing and existing:IsA("BasePart") then
+				local bulb = part("ExteriorDiffuser", Vector3.new(1.4, 0.06, 0.5),
+					existing.CFrame * CFrame.new(0, -existing.Size.Y / 2 - 0.04, 0), lampColor, Enum.Material.Neon)
+				light(bulb, 17, 1.1)
+			end
+		end
+		local drop = plot.Markers.PackageDrop
+		local dropBase = drop.CFrame * CFrame.new(0, -drop.Size.Y / 2 + 0.02, 0)
+		for _, x in ipairs({-8, 8}) do
+			part("ReceivingBoundary", Vector3.new(0.12, 0.025, 5), dropBase * CFrame.new(x, 0, 0), caution, Enum.Material.SmoothPlastic)
+		end
+		for _, z in ipairs({-2.5, 2.5}) do
+			part("ReceivingBoundary", Vector3.new(16, 0.025, 0.12), dropBase * CFrame.new(0, 0, z), caution, Enum.Material.SmoothPlastic)
+		end
+		local receiving = part("ReceivingLabel", Vector3.new(8, 0.025, 1.2), dropBase * CFrame.new(0, 0, 3.5), steel)
+		label(receiving, "RECEIVING / KEEP CLEAR", Enum.NormalId.Top, caution)
+		local header = plot.Model:FindFirstChild("DoorFrame_Top", true)
+		if header and header:IsA("BasePart") then
+			local sign = part("DockSign", Vector3.new(7.6, 1.6, 0.1), header.CFrame * CFrame.new(0, 1.2, -header.Size.Z / 2 - 0.08), steel)
+			label(sign, string.format("BAY %02d  /  WITB", plot.Slot))
+		end
+		local wall = plot.Model:FindFirstChild("Warehouse_backwall", true)
+		if wall and wall:IsA("BasePart") then
+			local sign = part("OperationsSign", Vector3.new(10, 2.3, 0.1), wall.CFrame * CFrame.new(0, 2, -wall.Size.Z / 2 - 0.08), steel)
+			label(sign, "WHAT'S IN THE BOX?\nRECEIVE  /  DISCOVER  /  COLLECT")
+		end
+		-- Fixed indicators are geometry; connections are bound separately after cloning.
+		for _, name in ipairs({"EmployeeDoor_panel", "GarageDoor_Panel"}) do
+			local door = plot.Model:FindFirstChild(name)
+			if door and door:IsA("BasePart") then
+				part("DoorStatus_" .. name, Vector3.new(0.25, 0.7, 0.12),
+					door.CFrame * CFrame.new(door.Size.X / 2 + 0.6, -door.Size.Y / 2 + 3, -0.85), theme.Accent, Enum.Material.Neon)
+			end
+		end
+		builder.BindPlot(plot, folder, interactive)
+	end
+	return builder
+end
+]]></string>
+      </Properties>
+    </Item>
+    <Item class="ModuleScript" referent="4">
+      <Properties>
+        <string name="Name">YardLayout</string>
+        <string name="Source"><![CDATA[-- Pure placement plan in studs relative to TruckStop's bottom face.
+-- Plot allocation is four columns, spaced 90 across and 140 along world Z.
+local layout = {ColumnSpacing = 90, RowSpacing = 140, Columns = 4}
+function layout.Address(slot)
+	local column = (slot - 1) % layout.Columns
+	local row = math.floor((slot - 1) / layout.Columns)
+	return column, row
+end
+function layout.PlotParts()
+	local parts = {}
+	local function add(name, size, position, finish)
+		table.insert(parts, {name = name, size = size, position = position, finish = finish})
+	end
+	-- Route is open from -50 (front of arriving cab) through the bumper at 0.
+	for _, x in ipairs({-7.5, 7.5}) do
+		add("DeliveryEdge", {0.16, 0.025, 49}, {x, 0.06, -24.5}, "Paint")
+	end
+	for _, z in ipairs({-35, -22, -9}) do
+		add("RouteDash", {0.2, 0.025, 3.2}, {0, 0.06, z}, "Paint")
+	end
+	add("Walkway", {6, 0.04, 50}, {29, 0.05, 28}, "Concrete")
+	add("WalkwayEdge", {0.12, 0.025, 50}, {25.9, 0.07, 28}, "SteelBlue")
+	for _, x in ipairs({-39, -31, -23}) do
+		add("ParkingLine", {0.13, 0.025, 14}, {x, 0.06, 1}, "Paint")
+	end
+	add("ParkingEnd", {16, 0.025, 0.13}, {-31, 0.06, 8}, "Paint")
+	-- A rear container and side utility cabinet add silhouettes beyond the building.
+	add("ContainerBody", {10, 7, 16}, {-17, 3.55, 70}, "Container")
+	for _, x in ipairs({-19.5, -14.5}) do
+		add("ContainerDoor", {4.8, 6.5, 0.12}, {x, 3.55, 61.93}, "Steel")
+		add("ContainerLatch", {0.1, 5.7, 0.16}, {x, 3.55, 61.82}, "SteelBlue")
+	end
+	for _, x in ipairs({-21, -19, -17, -15, -13}) do
+		add("ContainerRib", {0.12, 6.8, 0.1}, {x, 3.55, 78.06}, "Steel")
+	end
+	add("UtilityCabinet", {3, 4, 2}, {35, 2.05, 42}, "Steel")
+	add("UtilityFace", {2.5, 3.4, 0.06}, {35, 2.05, 40.95}, "SteelBlue")
+	return parts
+end
+function layout.RowParts(row)
+	local parts = {}
+	local function add(name, size, position, finish, collidable)
+		table.insert(parts, {name = name, size = size,
+			position = {position[1], position[2], position[3] + row * layout.RowSpacing},
+			finish = finish, collidable = collidable == true})
+	end
+	-- Grounds fill empty lots too, so one player's warehouse feels part of a place.
+	add("EstateGround", {360, 1, 140}, {135, -0.47, 22}, "Asphalt", true)
+	add("ServiceRoad", {360, 1, 22}, {135, -0.46, -44}, "Road", true)
+	for column = 0, 3 do
+		local x = column * layout.ColumnSpacing
+		for _, edge in ipairs({-29, 29}) do
+			add("LotBoundary", {0.12, 0.025, 52}, {x + edge, 0.065, 33}, "Concrete")
+		end
+		for _, edge in ipairs({7, 59}) do
+			add("LotBoundary", {58, 0.025, 0.12}, {x, 0.065, edge}, "Concrete")
+		end
+		add("LotPost", {0.14, 3, 0.14}, {x + 27, 1.55, -20}, "Steel")
+		add("LotMarker", {4.5, 1.8, 0.1}, {x + 27, 3.1, -20}, "Steel")
+		parts[#parts].text = string.format("WITB LOGISTICS\nLOT %02d", row * 4 + column + 1)
+		add("RoadCenterDash", {8, 0.025, 0.18}, {x, 0.065, -44}, "Paint")
+		add("StreetPole", {0.25, 13, 0.25}, {x + 38, 6.56, -31}, "Steel")
+		add("StreetArm", {3, 0.2, 0.2}, {x + 36.6, 13, -31}, "Steel")
+		add("StreetLamp", {1.4, 0.1, 0.7}, {x + 35.8, 12.85, -31}, "Lamp")
+		add("RearVerge", {80, 0.1, 4}, {x, 0.08, 81}, "Grass")
+		-- Low plant masses on the rear verge, not a wall across visitor routes.
+		for _, shrubX in ipairs({-28, 0, 28}) do
+			add("Shrub", {3, 1.8, 2}, {x + shrubX, 1, 81}, "Foliage")
+		end
+	end
+	for _, x in ipairs({-42, 312}) do
+		add("EstateEdge", {0.15, 0.1, 147}, {x, 0.08, 18.5}, "Concrete")
+	end
+	-- A cross-row pedestrian link on the outside of all four warehouse columns.
+	add("ParkWalk", {5, 0.04, 140}, {310, 0.06, 22}, "Concrete")
+	return parts
+end
+return layout
+]]></string>
+      </Properties>
+    </Item>
+  </Item>
+</roblox>
