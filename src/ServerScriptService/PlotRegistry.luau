@@ -17,8 +17,16 @@ local plotsFolder = Instance.new("Folder")
 plotsFolder.Name = "WarehousePlots"
 plotsFolder.Parent = workspace
 local added = Instance.new("BindableEvent")
-local registry = {Added = added.Event}
 local plots, slots = {}, {}
+local registry = {Added = {}}
+-- BindableEvents copy Lua tables. Send an Instance and resolve the canonical
+-- plot here so subscribers share its identity, prizes and upgrade callbacks.
+function registry.Added:Connect(callback)
+	return added.Event:Connect(function(owner)
+		local plot = plots[owner]
+		if plot then callback(plot) end
+	end)
+end
 
 function registry.GetAll()
 	local list = {}
@@ -93,7 +101,7 @@ function registry.Assign(player, scannerUnlocked)
 	slots[slot] = player
 	building.Parent = plotsFolder
 	player.RespawnLocation = spawn
-	added:Fire(plot)
+	added:Fire(player)
 	return plot
 end
 function registry.CanInteract(plot, player, object, distance)
