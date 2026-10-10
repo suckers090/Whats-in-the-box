@@ -71,6 +71,7 @@ stateEvent.OnServerEvent:Connect(function(player, action, id)
 	end
 end)
 local function runPlot(plot)
+	if not plot.Model.Parent or Registry.Get(plot.Owner) ~= plot or plot.Owner.Parent ~= Players then return end
 	local world = plot.Runtime
 	local packageDrop = plot.Markers.PackageDrop
 	local truckStop = plot.Markers.TruckStop
@@ -82,7 +83,7 @@ local function runPlot(plot)
 		return part
 	end
 	-- TruckStop marks the rear bumper at dock level. Local +Z points toward the dock.
-	-- Keep the original simple truck; it reverses into the dock on the initial delivery.
+	-- The existing simple truck reverses into the dock, unloads, then drives back out.
 	local truckTarget = truckStop.CFrame * CFrame.new(0, -truckStop.Size.Y / 2, -6.5)
 	local truckStart = truckTarget * CFrame.new(0, 0, -29)
 	local truck = Instance.new("Model")
@@ -90,9 +91,9 @@ local function runPlot(plot)
 	truck.Parent = world
 
 	makePart("TruckBody", Vector3.new(9, 6, 13), truckStart * CFrame.new(0, 4, 0),
-		Color3.fromRGB(45, 145, 240), truck)
+		Color3.fromRGB(52, 79, 98), truck)
 	makePart("Cab", Vector3.new(9, 5, 5), truckStart * CFrame.new(0, 3.5, -11),
-		Color3.fromRGB(35, 110, 200), truck)
+		Color3.fromRGB(37, 48, 65), truck)
 	for _, x in ipairs({-4, 4}) do
 		for _, z in ipairs({4, -10}) do
 			local wheel = makePart("Wheel", Vector3.new(1, 2.5, 2.5),
@@ -100,7 +101,55 @@ local function runPlot(plot)
 			wheel.Shape = Enum.PartType.Cylinder
 		end
 	end
+	-- Lightweight detailing without external assets or changes to the warehouse model.
+	local glass = makePart("Windshield", Vector3.new(7.8, 2, 0.12),
+		truckStart * CFrame.new(0, 4.2, -13.56), Color3.fromRGB(123, 168, 185), truck, Enum.Material.Glass)
+	glass.Transparency = 0.3
+	makePart("FrontBumper", Vector3.new(9.4, 0.6, 0.7),
+		truckStart * CFrame.new(0, 1.6, -13.7), Color3.fromRGB(79, 88, 99), truck, Enum.Material.Metal)
+	makePart("RearBumper", Vector3.new(9.4, 0.5, 0.5),
+		truckStart * CFrame.new(0, 1.5, 6.7), Color3.fromRGB(79, 88, 99), truck, Enum.Material.Metal)
+	for _, x in ipairs({-3.2, 3.2}) do
+		makePart("Headlight", Vector3.new(1.1, 0.6, 0.12),
+			truckStart * CFrame.new(x, 2.5, -13.56), Color3.fromRGB(224, 236, 247), truck, Enum.Material.Neon)
+		makePart("RearLight", Vector3.new(0.8, 0.35, 0.12),
+			truckStart * CFrame.new(x, 2.4, 6.56), Color3.fromRGB(211, 72, 66), truck, Enum.Material.Neon)
+	end
+	local body = truck:FindFirstChild("TruckBody")
+	for _, face in ipairs({Enum.NormalId.Left, Enum.NormalId.Right}) do
+		local sign = Instance.new("SurfaceGui")
+		sign.Face = face
+		sign.CanvasSize = Vector2.new(520, 240)
+		sign.Parent = body
+		local label = Instance.new("TextLabel")
+		label.Size = UDim2.fromScale(1, 1)
+		label.BackgroundTransparency = 1
+		label.Font = Enum.Font.GothamBold
+		label.TextColor3 = Color3.fromRGB(229, 238, 247)
+		label.TextSize = 38
+		label.Text = "WHAT'S IN THE BOX?\nWAREHOUSE DELIVERY"
+		label.Parent = sign
+	end
 	truck.WorldPivot = truckStart
+	local truckAppearance = {}
+	for _, part in ipairs(truck:GetDescendants()) do
+		if part:IsA("BasePart") then
+			truckAppearance[part] = part.Transparency
+			-- This is an animated delivery prop, not a drivable physics vehicle.
+			part.CanCollide = false
+			part.CanTouch = false
+			part.CanQuery = false
+		end
+	end
+	local function truckVisible(visible)
+		for part, transparency in pairs(truckAppearance) do
+			part.Transparency = visible and transparency or 1
+		end
+		for _, object in ipairs(truck:GetDescendants()) do
+			if object:IsA("SurfaceGui") then object.Enabled = visible end
+		end
+	end
+	truckVisible(false)
 
 	-- PACKAGE FOLDER
 	local packages = plot.Packages
@@ -191,67 +240,86 @@ local function runPlot(plot)
 		end)
 	end
 
-	-- DELIVERY ANIMATION
-	local function deliver()
-		print("Delivery truck arriving!")
-
-		local startPivot = truck:GetPivot()
-		local targetPivot = truckTarget
-
+	-- One controller per plot serializes arrival, unloading and departure.
+	local destroyed = false
+	local activeTween = nil
+	local destroyedConnection = plot.Model.Destroying:Connect(function()
+		destroyed = true
+		if activeTween then activeTween:Cancel() end
+	end)
+	local function alive()
+		return not destroyed and plot.Model.Parent ~= nil and Registry.Get(plot.Owner) == plot and plot.Owner.Parent == Players
+	end
+	local function setDeliveryPhase(phase, due)
+		if not alive() then return end
+		plot.Owner:SetAttribute("DeliveryPhase", phase)
+		plot.Owner:SetAttribute("NextDeliveryAt", due or 0)
+	end
+	local function waitActive(seconds)
+		local deadline = os.clock() + seconds
+		while alive() and os.clock() < deadline do task.wait(math.min(0.1, deadline - os.clock())) end
+		return alive()
+	end
+	local function moveTruck(target)
+		if not alive() then return false end
 		local driver = Instance.new("CFrameValue")
-		driver.Value = startPivot
-
-		local connection = driver.Changed:Connect(function(cf)
-			if truck.Parent then truck:PivotTo(cf) end
+		driver.Value = truck:GetPivot()
+		local connection = driver.Changed:Connect(function(frame)
+			if alive() then truck:PivotTo(frame) end
 		end)
-
-		local tween = TweenService:Create(
-			driver,
-			TweenInfo.new(5, Enum.EasingStyle.Linear),
-			{Value = targetPivot}
-		)
-
-		tween:Play()
-		tween.Completed:Wait()
-
+		activeTween = TweenService:Create(driver,
+			TweenInfo.new(5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {Value = target})
+		activeTween:Play()
+		activeTween.Completed:Wait()
 		connection:Disconnect()
 		driver:Destroy()
-
-		task.wait(1)
-
-		-- FIRST THREE PACKAGES
-		for i = 1, 3 do
-			if not plot.Model.Parent then return end
-			spawnPackage(i)
-			task.wait(0.5)
-		end
-
-		print("Delivery complete! Three packages arrived.")
+		activeTween = nil
+		if alive() then truck:PivotTo(target) end
+		return alive()
 	end
-
-	task.wait(3)
-	if not plot.Model.Parent then return end
-	deliver()
-	-- AUTOMATIC PACKAGE RESTOCK
-	task.spawn(function()
-		while plot.Model.Parent do
-			task.wait(5)
-
-			if plot.Model.Parent and #packages:GetChildren() == 0 then
-
-				print("Preparing next delivery...")
-				task.wait(3)
-
-				for i = 1, 3 do
-					if not plot.Model.Parent then return end
-					spawnPackage(i)
-					task.wait(0.5)
-				end
-
-				print("New packages delivered!")
-			end
+	-- DELIVERY CYCLE (also exercised by the standalone lifecycle regression test).
+	local function deliver()
+		setDeliveryPhase("Queued", workspace:GetServerTimeNow() + 3)
+		if not waitActive(3) then return false end
+		if plot.Owner:GetAttribute("DataReady") ~= true then return true end
+		truck:PivotTo(truckStart)
+		truckVisible(true)
+		setDeliveryPhase("Arriving")
+		if not moveTruck(truckTarget) then return false end
+		setDeliveryPhase("Unloading")
+		for index = 1, 3 do
+			if not alive() then return false end
+			spawnPackage(index)
+			if not waitActive(0.5) then return false end
 		end
-	end)
+		if plot.Owner.Parent == Players then notice:FireClient(plot.Owner, "Delivery complete / 3 mystery packages arrived.") end
+		setDeliveryPhase("Departing")
+		if not moveTruck(truckStart) then return false end
+		truckVisible(false)
+		setDeliveryPhase("Ready")
+		return true
+	end
+	local function packageCount()
+		if alive() then plot.Owner:SetAttribute("PackageCount", #packages:GetChildren()) end
+	end
+	local addedConnection = packages.ChildAdded:Connect(packageCount)
+	local removedConnection = packages.ChildRemoved:Connect(packageCount)
+	packageCount()
+	while alive() do
+		local data = sessions[plot.Owner]
+		if not data then break end
+		if plot.Owner:GetAttribute("DataReady") ~= true then
+			setDeliveryPhase("Paused")
+		elseif data.pending then
+			setDeliveryPhase("Choose")
+		elseif #packages:GetChildren() > 0 then
+			setDeliveryPhase("Ready")
+		elseif not deliver() then break end
+		if not waitActive(0.25) then break end
+	end
+	addedConnection:Disconnect()
+	removedConnection:Disconnect()
+	destroyedConnection:Disconnect()
 
 end
 local function setupPlayer(player)

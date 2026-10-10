@@ -37,18 +37,36 @@ local function button(parent, title, position, size, callback)
 end
 local gui = create("ScreenGui", {Name = "WarehouseHUD", ResetOnSpawn = false, DisplayOrder = 5,
 	ZIndexBehavior = Enum.ZIndexBehavior.Sibling}, player:WaitForChild("PlayerGui"))
-local hud = create("Frame", {Size = UDim2.fromOffset(205, 68), Position = UDim2.fromOffset(14, 12),
+local hud = create("Frame", {Size = UDim2.fromOffset(205, 88), Position = UDim2.fromOffset(14, 12),
 	BackgroundColor3 = theme.Background, BackgroundTransparency = 0.08, BorderSizePixel = 0}, gui)
 surface(hud)
 local cashLabel = text(hud, "$0", 22, UDim2.fromOffset(14, 8), UDim2.new(1, -28, 0, 28))
 local plotLabel = text(hud, "WAREHOUSE / ASSIGNING", 10, UDim2.fromOffset(14, 39), UDim2.new(1, -28, 0, 20), theme.Muted)
 cashLabel.TextColor3 = theme.Success
+local deliveryLabel = text(hud, "DELIVERY / PREPARING", 10, UDim2.fromOffset(14, 61), UDim2.new(1, -28, 0, 18), theme.Accent)
+local function updateDeliveryStatus()
+	local phase = player:GetAttribute("DeliveryPhase")
+	local count = player:GetAttribute("PackageCount") or 0
+	local labels = {Arriving = "TRUCK / ARRIVING", Unloading = "DOCK / UNLOADING",
+		Departing = "TRUCK / DEPARTING", Choose = "CHOOSE KEEP OR SELL", Paused = "DELIVERY / SAVE PAUSED"}
+	if phase == "Queued" then
+		local seconds = math.max(0, math.ceil((player:GetAttribute("NextDeliveryAt") or 0) - workspace:GetServerTimeNow()))
+		deliveryLabel.Text = "NEXT DELIVERY / " .. seconds .. "s"
+	elseif phase == "Ready" then
+		deliveryLabel.Text = "PACKAGES READY / " .. count
+	else deliveryLabel.Text = labels[phase] or "DELIVERY / PREPARING" end
+end
+for _, attribute in ipairs({"DeliveryPhase", "PackageCount", "NextDeliveryAt"}) do
+	player:GetAttributeChangedSignal(attribute):Connect(updateDeliveryStatus)
+end
+updateDeliveryStatus()
+task.spawn(function() while gui.Parent do task.wait(1); updateDeliveryStatus() end end)
 local dock = create("Frame", {AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -14),
 	Size = UDim2.new(0.94, 0, 0, 48), BackgroundColor3 = theme.Background, BorderSizePixel = 0}, gui)
 surface(dock)
 if UserInputService.TouchEnabled then
 	dock.AnchorPoint = Vector2.new(0.5, 0)
-	dock.Position = UDim2.new(0.5, 0, 0, 88)
+	dock.Position = UDim2.new(0.5, 0, 0, 108)
 end
 create("UISizeConstraint", {MaxSize = Vector2.new(610, 48)}, dock)
 create("UIPadding", {PaddingLeft = UDim.new(0, 5), PaddingRight = UDim.new(0, 5)}, dock)

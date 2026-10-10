@@ -13,3 +13,5 @@ Start with [Windows Rojo setup](docs/ROJO_SETUP.md) to connect this folder to a 
 - docs/: import history, testing, and setup guides.
 
 Interactive employee and garage doors are available for Studio testing: see [door testing](docs/DOOR_TESTING.md). Persistent cash/inventory/discoveries/scanner profiles are implemented for testing. Preview mode intentionally resets each server session. Actual Roblox DataStore integration has not been verified by the assistant. Rojo tracks script files, not the Blender warehouse assets.
+
+The current delivery polish update adds repeating truck trips and an owner-specific dock status line. See [delivery update and Studio checks](docs/DELIVERY_POLISH.md). Update just its two source files to preserve your local Studio save configuration.
